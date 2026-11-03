@@ -19,7 +19,7 @@ $('#places').onclick=e=>{const b=e.target.closest('[data-place]');if(b)visit(+b.
 $('#closePanel').onclick=()=>$('#panel').hidden=true;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#panel').hidden=true});
 $('#exit').onclick=()=>{sessionStorage.removeItem('bb-age');location.reload()};
-$('#ageForm').onsubmit=e=>{e.preventDefault();if(!isAdult($('#dob').value)||!$('#attest').checked){$('#ageError').textContent='Entry requires confirmation that you are at least 21.';return}sessionStorage.setItem('bb-age','yes');enter()};
+$('#ageForm').onsubmit=e=>{e.preventDefault();if(!isAdult($('#dob').value)||!$('#attest').checked){$('#ageError').textContent='Entry requires confirmation that you are at least 21.';return}sessionStorage.setItem('bb-age','yes');enter().then(openSharedPlace)};
 async function enter(){$('#gate').hidden=true;$('#app').hidden=false;if(!world){try{const m=await import('./world.js');world=await m.init($('#viewport'),places,visit);$('#worldStatus').textContent='THE WORLD IS YOURS · 7 DESTINATIONS'}catch(e){$('#worldStatus').textContent='3D unavailable. Explore all destinations using the buttons below.';console.error(e)}}}
 $('#home').onclick=()=>world?.reset();
 $('#share').onclick=async()=>{const url=new URL(location.href);url.search='';url.hash='place='+current;try{if(navigator.share)await navigator.share({title:'Best Budz World · '+places[current][0],url:url.href});else{await navigator.clipboard.writeText(url.href);toast('Destination link copied')}}catch{toast('Sharing unavailable. Copy this page address to share.')}};
@@ -32,4 +32,6 @@ $('#emailForm').onsubmit=async e=>{e.preventDefault();try{const r=await fetch(ne
 $('#roomForm').onsubmit=e=>{e.preventDefault();const room=$('#room').value;if(!validRoom(room))return;socket?.close();const u=new URL('groups',api);u.protocol=u.protocol==='https:'?'wss:':'ws:';u.searchParams.set('room',room);socket=new WebSocket(u);socket.onopen=()=>{$('#roomStatus').textContent='Connected to '+room;$('#chatForm').hidden=false;send({type:'move',place:current})};socket.onclose=()=>{if($('#roomStatus'))$('#roomStatus').textContent='Disconnected';if($('#chatForm'))$('#chatForm').hidden=true};socket.onerror=()=>toast('Group connection failed');socket.onmessage=e=>{try{const m=JSON.parse(e.data);if(!$('#messages'))return;const li=document.createElement('li');li.textContent=m.type==='presence'?m.count+' visitors in this room':m.type==='move'?m.id+' is visiting '+places[m.place][0]:m.id+': '+m.text;$('#messages').append(li);while($('#messages').children.length>30)$('#messages').firstChild.remove()}catch{}}};
 $('#chatForm').onsubmit=e=>{e.preventDefault();send({type:'chat',text:$('#message').value});$('#message').value=''};$('#leave').onclick=()=>socket?.close()};
 if(sessionStorage.getItem('bb-age')==='yes')await enter();
-const match=location.hash.match(/^#place=([0-6])$/);if(match&&sessionStorage.getItem('bb-age'))visit(+match[1]);
+function openSharedPlace(){const match=location.hash.match(/^#place=([0-6])$/);if(match&&sessionStorage.getItem('bb-age')==='yes')visit(+match[1])}
+openSharedPlace();
+window.addEventListener('hashchange',openSharedPlace);
