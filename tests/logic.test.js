@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {isAdult,consumeToken,validRoom} from '../logic.js';
+test('age boundary and invalid dates',()=>{const now=new Date(2026,10,3);assert.equal(isAdult('2005-11-03',now),true);assert.equal(isAdult('2005-11-04',now),false);assert.equal(isAdult('2027-01-01',now),false);assert.equal(isAdult('2000-02-30',now),false);assert.equal(isAdult('',now),false)});
+test('verification expiry and replay',()=>{const t=new Map([['a',{email:'a@example.com',expires:200}],['b',{email:'b@example.com',expires:50}]]);assert.equal(consumeToken(t,'a',100),'a@example.com');assert.equal(consumeToken(t,'a',100),null);assert.equal(consumeToken(t,'b',100),null)});
+test('room boundaries',()=>{assert.equal(validRoom('best-budz'),true);assert.equal(validRoom('../bad'),false);assert.equal(validRoom('ab'),false);assert.equal(validRoom('x'.repeat(41)),false)});

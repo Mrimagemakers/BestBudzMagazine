@@ -1,0 +1,3 @@
+export function isAdult(value,now=new Date()){if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value))return false;const [y,m,d]=value.split('-').map(Number);const date=new Date(y,m-1,d);if(date.getFullYear()!==y||date.getMonth()!==m-1||date.getDate()!==d)return false;let age=now.getFullYear()-y;if(now.getMonth()+1<m||(now.getMonth()+1===m&&now.getDate()<d))age--;return age>=21&&age<130}
+export function validRoom(value){return typeof value==='string'&&/^[a-zA-Z0-9-]{3,40}$/.test(value)}
+export function consumeToken(tokens,token,now=Date.now()){const record=tokens.get(token);tokens.delete(token);return record&&record.expires>now?record.email:null}
