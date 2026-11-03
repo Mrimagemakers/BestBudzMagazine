@@ -17,3 +17,10 @@ Licensed media must be supplied before cinema screenings or music performances; 
 
 ## Validation
 `npm test` checks gate date boundaries, verification token consumption, and group input constraints. Manual device QA remains necessary for WebXR hardware.
+
+## Interior and NPC update
+All seven venues now have open, walkable doorways, window/wall collisions and furnished interiors. The world starts at eye level. Use WASD, arrow keys or hold the on-screen arrows; drag to look. Destination cards offer **Go inside**. **Street view** returns to the plaza; **Aerial view** gives an overview.
+
+Seven stationary hosts and four walking visitors have scripted conversations. Click/tap a character or approach and press **E / Talk to NPC**. Dialogue is displayed in the 3D world for VR users. VR adds left-thumbstick movement, right-thumbstick snap turns, and trigger selection of visible floors for teleporting. Hardware testing is still required.
+
+Brick, stone, wood and plaster textures are locally generated with bump mapping. The scene adds sunlight shadows, glass, landscaping, furniture and articulated NPCs. These are procedural assets, not scanned photorealistic buildings or humans. `npm test` includes doorway routes, wall/window collision and unobstructed plaza paths.
