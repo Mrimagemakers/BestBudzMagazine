@@ -4,3 +4,6 @@
 
 /* Keep the street-level view clear while exploring. */
 .intro{top:120px;left:24px;max-width:240px;padding:14px 20px;background:#122a22b8;border-radius:14px}.intro h1{font-size:32px;margin:8px 0}.intro p{font-size:11px;margin:8px 0}.intro .eyebrow{font-size:8px}#viewport{height:70dvh;min-height:480px}#worldStatus{background:#132e27dd;padding:10px 14px;border-radius:10px;max-width:330px;line-height:1.5}@media(max-width:800px){.intro{top:95px;left:10px;max-width:175px;padding:10px}.intro h1{font-size:24px}.intro p{display:none}#worldStatus{top:190px;right:10px;max-width:210px;font-size:10px}.worldbar button{font-size:12px;padding:10px 12px}}
+
+/* During immersive sessions, suppress all HTML banners, toast messages and panels. */
+body.xr-session-active .intro,body.xr-session-active #worldStatus,body.xr-session-active #toast,body.xr-session-active #panel{display:none!important;pointer-events:none!important}
