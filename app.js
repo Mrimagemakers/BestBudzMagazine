@@ -34,7 +34,9 @@ function legacyAccountPanel(){show('<span class="eyebrow">YOUR COMMUNITY</span><
 $('#emailForm').onsubmit=async e=>{e.preventDefault();try{const r=await fetch(new URL('verify/request',api),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('#email').value})});$('#emailStatus').textContent=r.ok?'Check your inbox for a verification link.':'Email could not be sent. Try again later.'}catch{$('#emailStatus').textContent='Email service unavailable.'}};
 $('#roomForm').onsubmit=e=>{e.preventDefault();const room=$('#room').value;if(!validRoom(room))return;socket?.close();const u=new URL('groups',api);u.protocol=u.protocol==='https:'?'wss:':'ws:';u.searchParams.set('room',room);socket=new WebSocket(u);socket.onopen=()=>{$('#roomStatus').textContent='Connected to '+room;$('#chatForm').hidden=false;send({type:'move',place:current})};socket.onclose=()=>{if($('#roomStatus'))$('#roomStatus').textContent='Disconnected';if($('#chatForm'))$('#chatForm').hidden=true};socket.onerror=()=>toast('Group connection failed');socket.onmessage=e=>{try{const m=JSON.parse(e.data);if(!$('#messages'))return;const li=document.createElement('li');li.textContent=m.type==='presence'?m.count+' visitors in this room':m.type==='move'?m.id+' is visiting '+places[m.place][0]:m.id+': '+m.text;$('#messages').append(li);while($('#messages').children.length>30)$('#messages').firstChild.remove()}catch{}}};
 $('#chatForm').onsubmit=e=>{e.preventDefault();send({type:'chat',text:$('#message').value});$('#message').value=''};$('#leave').onclick=()=>socket?.close()};
+$('#gate').hidden=true;
 await requirePlayer();
+$('#gate').hidden=sessionStorage.getItem('bb-age')==='yes';
 if(sessionStorage.getItem('bb-age')==='yes')await enter();
 function openSharedPlace(){const match=location.hash.match(/^#place=([0-6])$/);if(match&&sessionStorage.getItem('bb-age')==='yes')visit(+match[1])}
 openSharedPlace();
