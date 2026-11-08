@@ -24,3 +24,29 @@ body.xr-session-active .intro,body.xr-session-active #worldStatus,body.xr-sessio
  #walkControls{justify-content:center}
 }
 body.xr-session-active header,body.xr-session-active .worldbar,body.xr-session-active .intro,body.xr-session-active #worldStatus,body.xr-session-active #toast,body.xr-session-active #panel{display:none!important}
+
+/* Mobile viewport and accessible destination sheet — 2026-11-08 */
+@media (max-width:800px){
+ html,body{width:100%;max-width:100%;overflow-x:hidden}
+ #app{position:relative;min-height:100dvh}
+ header{position:relative;z-index:2}
+ .intro,#worldStatus{display:none!important}
+ #viewport{height:calc(100dvh - 142px)!important;min-height:300px!important;position:relative;overflow:hidden}
+ #viewport canvas{display:block;max-width:100%;height:100%!important}
+ .worldbar{position:relative;z-index:2;background:#111d19;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:10px!important}
+ .worldbar>span{display:none!important}
+ #xr{flex:0 1 auto;order:0}
+ #walkControls{display:grid;grid-template-columns:repeat(3,44px);gap:4px;justify-content:center}
+ #walkControls button[data-walk="w"]{grid-column:2}
+ #walkControls button[data-walk="a"]{grid-column:1;grid-row:2}
+ #walkControls button[data-walk="s"]{grid-column:2;grid-row:2}
+ #walkControls button[data-walk="d"]{grid-column:3;grid-row:2}
+ #panel:not([hidden]){position:fixed!important;inset:auto 0 0!important;top:auto!important;bottom:0!important;width:100%!important;max-width:none!important;height:auto!important;max-height:min(70dvh,680px)!important;overflow-y:auto!important;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:20px 18px calc(24px + env(safe-area-inset-bottom))!important;border-radius:22px 22px 0 0!important;z-index:1000!important;background:#172d24!important;box-shadow:0 -16px 60px #000b}
+ #panelBody{clear:both;overflow-wrap:anywhere}
+ #panel h2{font-size:clamp(27px,7vw,38px);line-height:1.15;margin:12px 0}
+ #panel p{font-size:15px;line-height:1.55}
+ #panel article{padding:14px;margin:12px 0}
+ #closePanel{position:sticky!important;top:0;float:right;z-index:3;display:grid;place-items:center;width:48px;height:48px;min-width:48px;min-height:48px;background:#30483a!important;color:#fff!important;border-radius:50%;font-size:30px!important;line-height:1}
+ #toast{max-width:calc(100vw - 24px);bottom:calc(12px + env(safe-area-inset-bottom));font-size:12px}
+}
+@media (max-width:420px){header button{padding:8px!important;font-size:11px!important}.brand{font-size:24px!important}.brand span{font-size:7px!important}}
