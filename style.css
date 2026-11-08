@@ -7,3 +7,5 @@
 
 /* During immersive sessions, suppress all HTML banners, toast messages and panels. */
 body.xr-session-active .intro,body.xr-session-active #worldStatus,body.xr-session-active #toast,body.xr-session-active #panel{display:none!important;pointer-events:none!important}
+
+#loginGate{min-height:100dvh;display:grid;place-items:center;padding:24px;background:radial-gradient(at 80% 20%,#436749,#111d19 65%)}#loginGate form{width:min(460px,100%);padding:26px;border:1px solid #ffffff30;border-radius:18px;background:#14251d}#loginGate h1{font-size:clamp(32px,6vw,54px)}#loginGate .loginActions{display:flex;flex-wrap:wrap;gap:12px}#loginGate #loginStatus{min-height:3em}
