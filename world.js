@@ -206,10 +206,36 @@ export async function init(host, places, onVisit) {
   }
   renderer.xr.addEventListener('sessionstart',()=>{setImmersiveLayout(true);ar=renderer.xr.getSession().environmentBlendMode!=='opaque';city.visible=!ar;exhibit.visible=ar;aerial=false;if(homeMode){homeMode=false;homes.leave()}rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);if(ar){scene.background=null;scene.fog=null;exhibit.position.set(0,1.2,-1)}});
   renderer.xr.addEventListener('sessionend',()=>{setImmersiveLayout(false);ar=false;city.visible=true;exhibit.visible=false;rig.rotation.y=0;scene.background=sky;scene.fog=new T.Fog(sky,55,145);street()});
+  // Standard-mapping Xbox and PlayStation controllers via the browser Gamepad API.
+  // Controllers require a user button press to become visible in some browsers.
+  let previousButtons=new Set(),controllerSeen=false;
+  const deadzone=v=>Math.abs(v)<.16?0:Math.sign(v)*(Math.abs(v)-.16)/.84;
+  function gamepadInput(dt){
+    if(renderer.xr.isPresenting||!navigator.getGamepads)return;
+    const pad=Array.from(navigator.getGamepads()).find(p=>p&&p.mapping==='standard'&&p.connected);
+    if(!pad){previousButtons.clear();controllerSeen=false;return}
+    if(!controllerSeen){controllerSeen=true;const el=document.querySelector('#controllerStatus');if(el)el.textContent='Controller connected: '+pad.id.split('(')[0].slice(0,38)}
+    const axes=pad.axes||[],lx=deadzone(axes[0]||0),ly=deadzone(axes[1]||0),rx=deadzone(axes[2]||0),ry=deadzone(axes[3]||0);
+    // Standard mapping: left stick walk/strafe, right stick free-look.
+    yaw-=rx*dt*2.4;pitch=T.MathUtils.clamp(pitch-ry*dt*1.7,-1.25,1.25);
+    camera.rotation.set(pitch,yaw,0);
+    const speed=pad.buttons[6]?.pressed?6.5:3.8;
+    move((Math.sin(yaw)*ly+Math.cos(yaw)*lx)*dt*speed,(Math.cos(yaw)*ly-Math.sin(yaw)*lx)*dt*speed);
+    const pressed=new Set();
+    pad.buttons.forEach((b,i)=>{if(b.pressed)pressed.add(i)});
+    const tap=(i,fn)=>{if(pressed.has(i)&&!previousButtons.has(i))fn()};
+    tap(0,()=>{const r=host.getBoundingClientRect();pointer.set(0,0);ray.setFromCamera(pointer,camera);selectRay();talk()}); // A / Cross
+    tap(1,()=>{document.querySelector('#panel').hidden=true}); // B / Circle
+    tap(2,()=>{document.querySelector('#exploreMenu')?.click()}); // X / Square
+    tap(3,()=>{homeMode?street():reset()}); // Y / Triangle
+    tap(9,()=>{document.querySelector('#account')?.click()}); // Menu / Options
+    tap(8,()=>{document.querySelector('#walk')?.click()}); // View / Share
+    previousButtons=pressed;
+  }
   const clock=new T.Clock(),direction=new T.Vector3();let time=0;
   let frames=0;renderer.setAnimationLoop(()=>{
     const dt=Math.min(clock.getDelta(),.05);time+=dt;
-    if(!renderer.xr.isPresenting){let f=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));let s=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));const len=Math.max(1,Math.hypot(f,s));move((Math.sin(yaw)*f+Math.cos(yaw)*s)*dt*3.4/len,(Math.cos(yaw)*f-Math.sin(yaw)*s)*dt*3.4/len)}
+    if(!renderer.xr.isPresenting){gamepadInput(dt);let f=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));let s=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));const len=Math.max(1,Math.hypot(f,s));move((Math.sin(yaw)*f+Math.cos(yaw)*s)*dt*3.4/len,(Math.cos(yaw)*f-Math.sin(yaw)*s)*dt*3.4/len)}
     else if(!ar){for(const input of renderer.xr.getSession().inputSources){if(!input.gamepad)continue;const axes=input.gamepad.axes;const ax=axes.length>=4?axes[2]:axes[0]||0,az=axes.length>=4?axes[3]:axes[1]||0;if(input.handedness==='left'){renderer.xr.getCamera().getWorldDirection(direction);direction.y=0;direction.normalize();const f=Math.abs(az)>.18?-az:0,s=Math.abs(ax)>.18?ax:0;move((direction.x*f-direction.z*s)*dt*2.4,(direction.z*f+direction.x*s)*dt*2.4)}if(input.handedness==='right'){if(Math.abs(ax)<.3)snapReady=true;if(Math.abs(ax)>.7&&snapReady){rig.rotation.y-=Math.sign(ax)*Math.PI/6;snapReady=false}}}}
     for(const n of npcs){if(n.walking){const t=time*.3+n.phase;n.root.position.z=n.startZ+Math.sin(t)*3;n.root.rotation.y=Math.cos(t)>=0?0:Math.PI;n.limbs.forEach((l,j)=>l.rotation.x=Math.sin(time*5+n.phase)*(j%2?.3:.22)*(j<2?1:-1))}else{n.root.position.y=Math.sin(time*1.4+n.phase)*.012;n.limbs[0].rotation.z=.08+Math.sin(time+n.phase)*.04}}
     if(dialogue.visible){dialogue.lookAt(camera.getWorldPosition(direction));if(performance.now()>dialogueUntil)dialogue.visible=false}
