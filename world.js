@@ -1,5 +1,5 @@
 import * as T from 'three';
-import {buildHomes,HOMES} from './homes.js';
+import {buildHomes,HOMES} from './homes.js?v=textures-7';
 import {WORLD_COORDS,buildingWalls,blockedAt} from './logic.js';
 import {VRButton} from 'three/addons/webxr/VRButton.js';
 import {ARButton} from 'three/addons/webxr/ARButton.js';
