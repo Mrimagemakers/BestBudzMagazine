@@ -19,7 +19,11 @@ function library(){for(const name of ['Blue Dream','Sour Diesel','Granddaddy Pur
 $('#places').innerHTML=places.map((p,i)=>'<button data-place="'+i+'"><small>0'+(i+1)+' / EXPLORE</small>'+p[0]+' ↗</button>').join('');
 const homeSection=document.createElement('section');homeSection.className='destinations home-selector';homeSection.innerHTML='<span class="eyebrow">YOUR PERSONAL SPACE</span><h2>Choose your home</h2><p>Enter one of five furnished 3D interiors. Save your preferred starter home in Account.</p><nav id="homesList">'+HOMES.map(h=>'<button type="button" data-home="'+h.id+'">'+h.name+' ↗</button>').join('')+'</nav>';
 $('#places').closest('.destinations').after(homeSection);
-homeSection.addEventListener('click',e=>{const b=e.target.closest('[data-home]');if(!b)return;const h=world?.enterHome(b.dataset.home);if(h){$('#panel').hidden=true;$('#viewport').scrollIntoView({block:'start',behavior:'smooth'});toast('Welcome to '+h.name+' · Street view returns to town')}});
+function homeMediaPanel(h){
+ show('<span class="eyebrow">YOUR HOME / ENTERTAINMENT</span><h2>'+h.name+'</h2><p>Welcome home. Use the entertainment controls below, or close this panel to explore your 3D room.</p><div class="mediaActions"><a href="https://turnupmusic.online" target="_blank" rel="noopener noreferrer">♫ Turn Up Music Radio ↗</a><a href="https://www.plex.tv/watch-free-tv/" target="_blank" rel="noopener noreferrer">▣ Free live TV ↗</a><a href="https://www.pluto.tv/" target="_blank" rel="noopener noreferrer">▣ Pluto TV genres ↗</a></div><p class="fine">Media opens in a new tab. In-world streaming and channel selection are not yet implemented.</p>');
+}
+homeSection.addEventListener('click',e=>{const b=e.target.closest('[data-home]');if(!b)return;const h=world?.enterHome(b.dataset.home);if(h){$('#viewport').scrollIntoView({block:'start',behavior:'smooth'});homeMediaPanel(h)}});
+
 $('#exploreMenu').onclick=()=>document.querySelector('.home-selector')?.scrollIntoView({behavior:'smooth',block:'start'});
 $('#places').onclick=e=>{const b=e.target.closest('[data-place]');if(b)visit(+b.dataset.place)};
 $('#closePanel').onclick=()=>$('#panel').hidden=true;
