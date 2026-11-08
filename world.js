@@ -167,6 +167,7 @@ export async function init(host, places, onVisit) {
   function speak(info,position){const g=dialogueCanvas.getContext('2d');g.fillStyle='#132e27';g.fillRect(0,0,1024,512);g.strokeStyle='#d4d9a0';g.lineWidth=8;g.strokeRect(8,8,1008,496);g.fillStyle='#e5dea8';g.font='bold 45px sans-serif';g.fillText(info[0]+' / '+info[1],40,75,950);g.fillStyle='#fff7e5';g.font='37px sans-serif';let line='',y=150;for(const word of info[2].split(' ')){if(g.measureText(line+word).width>925){g.fillText(line,40,y);line='';y+=52}line+=word+' '}g.fillText(line,40,y);g.font='26px sans-serif';g.fillStyle='#b8c6b3';g.fillText('NPC · scripted conversation',40,465);dialogueTexture.needsUpdate=true;dialogue.position.copy(position).add(new T.Vector3(0,2.7,0));dialogue.visible=true;dialogueUntil=performance.now()+14000;document.querySelector('#worldStatus').textContent=info[0]+': '+info[2]}
   const exhibit=new T.Group();scene.add(exhibit);exhibit.visible=false;
   for(let i=0;i<3;i++){box(.25,.2,.15,places[6][3],(i-1)*.35,0,0,exhibit);sign(['Blue Dream','Sour Diesel','GDP'][i],(i-1)*.35,.22,0,.3,exhibit)}
+  let lookSensitivity=Number(localStorage.getItem('bb-look-sensitivity')||1),invertLook=localStorage.getItem('bb-invert-look')==='true';
   let yaw=0,pitch=0,drag=false,lastX=0,lastY=0,travel=0,ar=false,aerial=false,snapReady=true;
   const keys=new Set(),held=new Map();
   function street(){if(renderer.xr.isPresenting)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=false;rig.position.set(0,1.7,30);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0)}
@@ -180,7 +181,7 @@ export async function init(host, places, onVisit) {
   // Select a person/sign, or teleport to visible floor surfaces in VR.
   function selectRay(){const hit=ray.intersectObjects(city.children,true).find(h=>h.object!==dialogue);if(!hit||hit.distance>28)return;const data=hit.object.userData;if(data.npc){speak(data.npc,new T.Vector3(hit.point.x,0,hit.point.z));return}if(data.place!==undefined){onVisit(data.place);return}if(renderer.xr.isPresenting&&data.floor&&!blocked(hit.point.x,hit.point.z)){rig.position.set(hit.point.x,0,hit.point.z)}}
   host.addEventListener('pointerdown',e=>{drag=true;travel=0;lastX=e.clientX;lastY=e.clientY;host.setPointerCapture(e.pointerId)});
-  host.addEventListener('pointermove',e=>{if(!drag||renderer.xr.isPresenting)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;travel+=Math.abs(dx)+Math.abs(dy);yaw-=dx*.004;pitch=T.MathUtils.clamp(pitch-dy*.004,-1.25,1.25);camera.rotation.set(pitch,yaw,0);lastX=e.clientX;lastY=e.clientY});
+  host.addEventListener('pointermove',e=>{if(!drag||renderer.xr.isPresenting)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;travel+=Math.abs(dx)+Math.abs(dy);yaw-=dx*.004*lookSensitivity;pitch=T.MathUtils.clamp(pitch-dy*.004*lookSensitivity*(invertLook?-1:1),-1.25,1.25);camera.rotation.set(pitch,yaw,0);lastX=e.clientX;lastY=e.clientY});
   host.addEventListener('pointerup',e=>{drag=false;if(travel>7||renderer.xr.isPresenting)return;const r=host.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);selectRay()});host.addEventListener('pointercancel',()=>drag=false);
   function talk(){const pos=camera.getWorldPosition(new T.Vector3());const nearest=[...npcs].sort((a,b)=>a.root.position.distanceTo(pos)-b.root.position.distanceTo(pos))[0];if(nearest&&nearest.root.position.distanceTo(pos)<5)speak(nearest.info,nearest.root.position);else document.querySelector('#worldStatus').textContent='Walk closer to a host or visitor, then tap Talk.'}
   document.querySelector('#talk').onclick=talk;
@@ -217,14 +218,14 @@ export async function init(host, places, onVisit) {
     if(!controllerSeen){controllerSeen=true;const el=document.querySelector('#controllerStatus');if(el)el.textContent='Controller connected: '+pad.id.split('(')[0].slice(0,38)}
     const axes=pad.axes||[],lx=deadzone(axes[0]||0),ly=deadzone(axes[1]||0),rx=deadzone(axes[2]||0),ry=deadzone(axes[3]||0);
     // Standard mapping: left stick walk/strafe, right stick free-look.
-    yaw-=rx*dt*2.4;pitch=T.MathUtils.clamp(pitch-ry*dt*1.7,-1.25,1.25);
+    yaw-=rx*dt*2.4*lookSensitivity;pitch=T.MathUtils.clamp(pitch-ry*dt*1.7*lookSensitivity*(invertLook?-1:1),-1.25,1.25);
     camera.rotation.set(pitch,yaw,0);
     const speed=pad.buttons[6]?.pressed?6.5:3.8;
     move((Math.sin(yaw)*ly+Math.cos(yaw)*lx)*dt*speed,(Math.cos(yaw)*ly-Math.sin(yaw)*lx)*dt*speed);
     const pressed=new Set();
     pad.buttons.forEach((b,i)=>{if(b.pressed)pressed.add(i)});
     const tap=(i,fn)=>{if(pressed.has(i)&&!previousButtons.has(i))fn()};
-    tap(0,()=>{const r=host.getBoundingClientRect();pointer.set(0,0);ray.setFromCamera(pointer,camera);selectRay();talk()}); // A / Cross
+    tap(0,()=>{pointer.set(0,0);ray.setFromCamera(pointer,camera);selectRay();talk()}); // A / Cross
     tap(1,()=>{document.querySelector('#panel').hidden=true}); // B / Circle
     tap(2,()=>{document.querySelector('#exploreMenu')?.click()}); // X / Square
     tap(3,()=>{homeMode?street():reset()}); // Y / Triangle
@@ -244,5 +245,5 @@ export async function init(host, places, onVisit) {
   });
   new ResizeObserver(()=>{if(!host.clientWidth||!host.clientHeight)return;camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix();renderer.setSize(host.clientWidth,host.clientHeight)}).observe(host);
   renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();document.querySelector('#worldStatus').textContent='3D paused. Reload to restore, or use destination buttons.'});
-  return {reset,visit,enter:i=>visit(i,true),enterHome};
+  return {reset,visit,enter:i=>visit(i,true),enterHome,setLookSettings:(sensitivity,inverted)=>{lookSensitivity=sensitivity;invertLook=inverted}};
 }
