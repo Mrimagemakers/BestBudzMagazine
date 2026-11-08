@@ -29,16 +29,58 @@ export async function init(host, places, onVisit) {
   const coords = WORLD_COORDS;
   let seed = 71;
   const rand = () => {seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296};
+  // Seeded procedural PBR-style surfaces: diffuse, micro-normal and roughness maps.
+  // No external asset dependency; textures remain available offline after load.
+  const surfaceCache = new Map();
   function surface(kind, base) {
-    const c = document.createElement('canvas'); c.width = c.height = 256;
-    const g = c.getContext('2d'); g.fillStyle = base; g.fillRect(0,0,256,256);
-    for(let i=0;i<6500;i++){g.fillStyle = `rgba(${rand()>.5?'255,255,255':'0,0,0'},${rand()*.1})`;g.fillRect(rand()*256,rand()*256,rand()*3+1,rand()*2+1)}
-    if(kind==='brick')for(let y=0;y<256;y+=32){g.fillStyle='#b6ac99';g.fillRect(0,y,256,2);for(let x=(y%64?32:0);x<256;x+=64)g.fillRect(x,y,2,32)}
-    if(kind==='wood')for(let y=0;y<256;y+=32){g.fillStyle='#33271b';g.fillRect(0,y,256,2);for(let j=0;j<16;j++){g.strokeStyle='rgba(36,24,12,.18)';g.beginPath();g.moveTo(0,y+rand()*30);g.bezierCurveTo(60,y+rand()*30,160,y+rand()*30,256,y+rand()*30);g.stroke()}}
-    if(kind==='tile'){g.strokeStyle='#7a8079';g.lineWidth=2;for(let y=0;y<256;y+=64){g.strokeRect(0,y,128,64);g.strokeRect(128,y,128,64)}}
-    const map = new T.CanvasTexture(c);map.colorSpace=T.SRGBColorSpace;map.wrapS=map.wrapT=T.RepeatWrapping;map.repeat.set(2,2);map.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
-    const bump=map.clone();bump.colorSpace=T.NoColorSpace;
-    return new T.MeshStandardMaterial({map,bumpMap:bump,bumpScale:kind==='wood'?.025:.065,roughness:.88});
+    const key = kind + ':' + base;
+    if(surfaceCache.has(key)) return surfaceCache.get(key);
+    const size = 512;
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d');
+    g.fillStyle = base; g.fillRect(0, 0, size, size);
+    const height = new Uint8ClampedArray(size * size);
+    const grain = (x,y,v) => { const ix = ((y+size)%size)*size + ((x+size)%size); height[ix] = Math.max(0,Math.min(255,v)); };
+    for(let y=0;y<size;y++) for(let x=0;x<size;x++) {
+      const noise = rand();
+      let h = 120 + (noise-.5)*45;
+      if(kind==='brick') {
+        const row=Math.floor(y/64), mortar=(y%64<5)||((x+(row%2)*64)%128<5);
+        h=mortar?48:150+(noise-.5)*55;
+      } else if(kind==='wood') {
+        const seam=y%64<3, knot=Math.sin(x*.035+Math.sin(y*.12)*2)*9;
+        h=seam?50:135+knot+(noise-.5)*22;
+      } else if(kind==='tile') {
+        const joint=(y%128<4)||((x+(Math.floor(y/128)%2)*128)%256<4);
+        h=joint?52:160+(noise-.5)*18;
+      } else h=135+(noise-.5)*35;
+      grain(x,y,h);
+    }
+    const image=g.getImageData(0,0,size,size), data=image.data;
+    const baseColor=new T.Color(base);
+    const r=baseColor.r*255, gg=baseColor.g*255, b=baseColor.b*255;
+    for(let y=0;y<size;y++) for(let x=0;x<size;x++) {
+      const i=y*size+x, o=i*4, v=height[i], factor=.75+v/510;
+      data[o]=Math.min(255,r*factor); data[o+1]=Math.min(255,gg*factor); data[o+2]=Math.min(255,b*factor);data[o+3]=255;
+      if(v<65){data[o]*=.67;data[o+1]*=.67;data[o+2]*=.67;}
+    }
+    g.putImageData(image,0,0);
+    const n=document.createElement('canvas');n.width=n.height=size;
+    const ng=n.getContext('2d'), nd=ng.createImageData(size,size);
+    const rough=document.createElement('canvas');rough.width=rough.height=size;
+    const rg=rough.getContext('2d'), rd=rg.createImageData(size,size);
+    const sample=(x,y)=>height[((y+size)%size)*size+((x+size)%size)];
+    for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+      const o=(y*size+x)*4, dx=(sample(x+1,y)-sample(x-1,y))/255,dy=(sample(x,y+1)-sample(x,y-1))/255;
+      const nx=-dx*2.2,ny=-dy*2.2,nz=1,inv=1/Math.hypot(nx,ny,nz);
+      nd.data[o]=(nx*inv*.5+.5)*255;nd.data[o+1]=(ny*inv*.5+.5)*255;nd.data[o+2]=(nz*inv*.5+.5)*255;nd.data[o+3]=255;
+      const rv=kind==='wood'?165:kind==='tile'?195:kind==='brick'?225:230;
+      rd.data[o]=rd.data[o+1]=rd.data[o+2]=Math.min(255,rv+(sample(x,y)-128)*.14);rd.data[o+3]=255;
+    }
+    ng.putImageData(nd,0,0);rg.putImageData(rd,0,0);
+    const texture=(canvas,srgb=false)=>{const t=new T.CanvasTexture(canvas);t.colorSpace=srgb?T.SRGBColorSpace:T.NoColorSpace;t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(2,2);t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());return t;};
+    const material=new T.MeshStandardMaterial({map:texture(c,true),normalMap:texture(n),normalScale:new T.Vector2(.48,.48),roughnessMap:texture(rough),roughness:1,metalness:0});
+    surfaceCache.set(key,material);return material;
   }
   const brick=surface('brick','#9e7962'), stone=surface('tile','#b6b6a5'), wood=surface('wood','#917044'), plaster=surface('noise','#e3d6bd');
   const metal=new T.MeshStandardMaterial({color:0x344940,metalness:.65,roughness:.32});
