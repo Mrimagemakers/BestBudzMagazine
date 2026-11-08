@@ -9,3 +9,18 @@
 body.xr-session-active .intro,body.xr-session-active #worldStatus,body.xr-session-active #toast,body.xr-session-active #panel{display:none!important;pointer-events:none!important}
 
 #loginGate{min-height:100dvh;display:grid;place-items:center;padding:24px;background:radial-gradient(at 80% 20%,#436749,#111d19 65%)}#loginGate form{width:min(460px,100%);padding:26px;border:1px solid #ffffff30;border-radius:18px;background:#14251d}#loginGate h1{font-size:clamp(32px,6vw,54px)}#loginGate .loginActions{display:flex;flex-wrap:wrap;gap:12px}#loginGate #loginStatus{min-height:3em}
+
+/* Mobile-first immersive viewport: never place promotional copy over the scene. */
+@media (max-width:800px){
+ .intro,#worldStatus{display:none!important}
+ header{height:64px!important;padding:8px 12px!important;gap:8px!important}
+ .brand{font-size:28px!important;gap:6px!important}.brand span{font-size:8px!important;letter-spacing:1px!important}
+ header button{padding:9px 12px!important;font-size:12px!important}
+ #viewport{height:calc(100dvh - 190px)!important;min-height:340px!important}
+ .worldbar{padding:8px 10px!important;gap:6px!important;justify-content:center!important}
+ .worldbar>span{display:none!important}
+ #xr{order:-1;justify-content:center;flex:1 1 100%}
+ #xr button{font-size:13px!important;min-height:44px!important}
+ #walkControls{justify-content:center}
+}
+body.xr-session-active header,body.xr-session-active .worldbar,body.xr-session-active .intro,body.xr-session-active #worldStatus,body.xr-session-active #toast,body.xr-session-active #panel{display:none!important}
