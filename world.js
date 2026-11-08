@@ -187,8 +187,21 @@ export async function init(host, places, onVisit) {
   document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();held.clear();drag=false}});
   const xrRoot=document.querySelector('#xr');xrRoot.append(VRButton.createButton(renderer));xrRoot.append(ARButton.createButton(renderer));
   for(let i=0;i<2;i++){const c=renderer.xr.getController(i);rig.add(c);const line=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(),new T.Vector3(0,0,-12)]),new T.LineBasicMaterial({color:0xd5ee83}));c.add(line);c.addEventListener('select',()=>{if(ar){return}const rotation=new T.Matrix4().extractRotation(c.matrixWorld);ray.ray.origin.setFromMatrixPosition(c.matrixWorld);ray.ray.direction.set(0,0,-1).applyMatrix4(rotation);selectRay()})}
-  renderer.xr.addEventListener('sessionstart',()=>{document.body.classList.add('xr-session-active');ar=renderer.xr.getSession().environmentBlendMode!=='opaque';city.visible=!ar;exhibit.visible=ar;aerial=false;rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);if(ar){scene.background=null;scene.fog=null;exhibit.position.set(0,1.2,-1)}});
-  renderer.xr.addEventListener('sessionend',()=>{document.body.classList.remove('xr-session-active');ar=false;city.visible=true;exhibit.visible=false;rig.rotation.y=0;scene.background=sky;scene.fog=new T.Fog(sky,55,145);street()});
+  // Immersive AR must never share the camera view with page banners or panels.
+  // Inline important styles also protect against stale mobile stylesheet caches.
+  const xrObstructions=['.intro','#worldStatus','#toast','#panel','header','.worldbar','.destinations','footer'];
+  const hiddenForXR=new Map();
+  function setImmersiveLayout(active){
+    document.body.classList.toggle('xr-session-active',active);
+    for(const selector of xrObstructions){
+      const el=document.querySelector(selector);if(!el)continue;
+      if(active){hiddenForXR.set(el,{value:el.style.getPropertyValue('display'),priority:el.style.getPropertyPriority('display')});el.style.setProperty('display','none','important');}
+      else if(hiddenForXR.has(el)){const previous=hiddenForXR.get(el);if(previous.value)el.style.setProperty('display',previous.value,previous.priority);else el.style.removeProperty('display');}
+    }
+    if(!active)hiddenForXR.clear();
+  }
+  renderer.xr.addEventListener('sessionstart',()=>{setImmersiveLayout(true);ar=renderer.xr.getSession().environmentBlendMode!=='opaque';city.visible=!ar;exhibit.visible=ar;aerial=false;rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);if(ar){scene.background=null;scene.fog=null;exhibit.position.set(0,1.2,-1)}});
+  renderer.xr.addEventListener('sessionend',()=>{setImmersiveLayout(false);ar=false;city.visible=true;exhibit.visible=false;rig.rotation.y=0;scene.background=sky;scene.fog=new T.Fog(sky,55,145);street()});
   const clock=new T.Clock(),direction=new T.Vector3();let time=0;
   renderer.setAnimationLoop(()=>{
     const dt=Math.min(clock.getDelta(),.05);time+=dt;
