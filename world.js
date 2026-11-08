@@ -13,16 +13,17 @@ export async function init(host, places, onVisit) {
   camera.rotation.order = 'YXZ';
   const rig = new T.Group(); rig.add(camera); scene.add(rig);
   const renderer = new T.WebGLRenderer({antialias:true, alpha:true});
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+  const mobileDevice=matchMedia('(max-width: 800px), (pointer: coarse)').matches;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, mobileDevice?1:1.5));
   renderer.setSize(host.clientWidth, host.clientHeight);
   renderer.xr.enabled = true;
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = !mobileDevice; renderer.shadowMap.type = T.PCFSoftShadowMap;
   renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
   host.append(renderer.domElement);
   scene.add(new T.HemisphereLight(0xe7f2ff, 0x76634b, 2.1));
   const sun = new T.DirectionalLight(0xffe3b3, 3.4);
   sun.position.set(-30, 45, 25); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.mapSize.set(mobileDevice?512:1024,mobileDevice?512:1024);
   Object.assign(sun.shadow.camera, {left:-48,right:48,top:48,bottom:-48,near:1,far:130});
   sun.shadow.bias = -.0004; sun.shadow.normalBias = .04; scene.add(sun);
   const city = new T.Group(); scene.add(city);
@@ -37,7 +38,7 @@ export async function init(host, places, onVisit) {
   function surface(kind, base) {
     const key = kind + ':' + base;
     if(surfaceCache.has(key)) return surfaceCache.get(key);
-    const size = 512;
+    const size = mobileDevice?128:256;
     const c = document.createElement('canvas'); c.width = c.height = size;
     const g = c.getContext('2d');
     g.fillStyle = base; g.fillRect(0, 0, size, size);
@@ -80,8 +81,8 @@ export async function init(host, places, onVisit) {
       rd.data[o]=rd.data[o+1]=rd.data[o+2]=Math.min(255,rv+(sample(x,y)-128)*.14);rd.data[o+3]=255;
     }
     ng.putImageData(nd,0,0);rg.putImageData(rd,0,0);
-    const texture=(canvas,srgb=false)=>{const t=new T.CanvasTexture(canvas);t.colorSpace=srgb?T.SRGBColorSpace:T.NoColorSpace;t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(2,2);t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());return t;};
-    const material=new T.MeshStandardMaterial({map:texture(c,true),normalMap:texture(n),normalScale:new T.Vector2(.48,.48),roughnessMap:texture(rough),roughness:1,metalness:0});
+    const texture=(canvas,srgb=false)=>{const t=new T.CanvasTexture(canvas);t.colorSpace=srgb?T.SRGBColorSpace:T.NoColorSpace;t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(2,2);t.anisotropy=Math.min(mobileDevice?2:4,renderer.capabilities.getMaxAnisotropy());return t;};
+    const material=new T.MeshStandardMaterial(mobileDevice?{map:texture(c,true),roughness:.85,metalness:0}:{map:texture(c,true),normalMap:texture(n),normalScale:new T.Vector2(.48,.48),roughnessMap:texture(rough),roughness:1,metalness:0});
     surfaceCache.set(key,material);return material;
   }
   const brick=surface('brick','#9e7962'), stone=surface('tile','#b6b6a5'), wood=surface('wood','#917044'), plaster=surface('noise','#e3d6bd');
@@ -206,13 +207,14 @@ export async function init(host, places, onVisit) {
   renderer.xr.addEventListener('sessionstart',()=>{setImmersiveLayout(true);ar=renderer.xr.getSession().environmentBlendMode!=='opaque';city.visible=!ar;exhibit.visible=ar;aerial=false;if(homeMode){homeMode=false;homes.leave()}rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);if(ar){scene.background=null;scene.fog=null;exhibit.position.set(0,1.2,-1)}});
   renderer.xr.addEventListener('sessionend',()=>{setImmersiveLayout(false);ar=false;city.visible=true;exhibit.visible=false;rig.rotation.y=0;scene.background=sky;scene.fog=new T.Fog(sky,55,145);street()});
   const clock=new T.Clock(),direction=new T.Vector3();let time=0;
-  renderer.setAnimationLoop(()=>{
+  let frames=0;renderer.setAnimationLoop(()=>{
     const dt=Math.min(clock.getDelta(),.05);time+=dt;
     if(!renderer.xr.isPresenting){let f=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));let s=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));const len=Math.max(1,Math.hypot(f,s));move((Math.sin(yaw)*f+Math.cos(yaw)*s)*dt*3.4/len,(Math.cos(yaw)*f-Math.sin(yaw)*s)*dt*3.4/len)}
     else if(!ar){for(const input of renderer.xr.getSession().inputSources){if(!input.gamepad)continue;const axes=input.gamepad.axes;const ax=axes.length>=4?axes[2]:axes[0]||0,az=axes.length>=4?axes[3]:axes[1]||0;if(input.handedness==='left'){renderer.xr.getCamera().getWorldDirection(direction);direction.y=0;direction.normalize();const f=Math.abs(az)>.18?-az:0,s=Math.abs(ax)>.18?ax:0;move((direction.x*f-direction.z*s)*dt*2.4,(direction.z*f+direction.x*s)*dt*2.4)}if(input.handedness==='right'){if(Math.abs(ax)<.3)snapReady=true;if(Math.abs(ax)>.7&&snapReady){rig.rotation.y-=Math.sign(ax)*Math.PI/6;snapReady=false}}}}
     for(const n of npcs){if(n.walking){const t=time*.3+n.phase;n.root.position.z=n.startZ+Math.sin(t)*3;n.root.rotation.y=Math.cos(t)>=0?0:Math.PI;n.limbs.forEach((l,j)=>l.rotation.x=Math.sin(time*5+n.phase)*(j%2?.3:.22)*(j<2?1:-1))}else{n.root.position.y=Math.sin(time*1.4+n.phase)*.012;n.limbs[0].rotation.z=.08+Math.sin(time+n.phase)*.04}}
     if(dialogue.visible){dialogue.lookAt(camera.getWorldPosition(direction));if(performance.now()>dialogueUntil)dialogue.visible=false}
     renderer.render(scene,camera);
+    if(++frames===2)document.querySelector('#viewport').dataset.rendered='true';
   });
   new ResizeObserver(()=>{if(!host.clientWidth||!host.clientHeight)return;camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix();renderer.setSize(host.clientWidth,host.clientHeight)}).observe(host);
   renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();document.querySelector('#worldStatus').textContent='3D paused. Reload to restore, or use destination buttons.'});
