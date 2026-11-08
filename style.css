@@ -109,3 +109,16 @@ footer{background:#07130f}
  .destinations nav button{min-height:84px;font-size:13px;padding:12px}
 }
 body.xr-session-active .worldbar,body.xr-session-active header,body.xr-session-active #panel{display:none!important}
+
+/* Second-pass compact HUD */
+#exploreMenu{background:#b9ff72!important;color:#102017!important;font-weight:700}
+.home-selector{scroll-margin-top:70px}
+@media(max-width:700px){
+ #app header{gap:5px!important}
+ #app header button{padding:7px!important;font-size:10px!important}
+ .brand{margin-right:auto!important}
+ .brand span{display:none!important}
+ .worldbar{max-width:calc(100vw - 12px)}
+ #xr{flex:0 0 auto!important}
+ #talk{max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
