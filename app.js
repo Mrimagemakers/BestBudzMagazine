@@ -30,7 +30,7 @@ $('#closePanel').onclick=()=>$('#panel').hidden=true;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#panel').hidden=true});
 $('#exit').onclick=()=>{sessionStorage.removeItem('bb-age');location.reload()};
 $('#ageForm').onsubmit=e=>{e.preventDefault();if(!isAdult($('#dob').value)||!$('#attest').checked){$('#ageError').textContent='Entry requires confirmation that you are at least 21.';return}sessionStorage.setItem('bb-age','yes');enter().then(openSharedPlace)};
-async function enter(){$('#gate').hidden=true;$('#app').hidden=false;if(!world){try{const m=await import('./world.js?v=mobile-perf-2');world=await m.init($('#viewport'),places,visit);$('#worldStatus').textContent='7 OPEN INTERIORS · 11 NPCs · WALK IN & EXPLORE'}catch(e){$('#worldStatus').textContent='3D unavailable. Explore all destinations using the buttons below.';console.error(e)}}}
+async function enter(){$('#gate').hidden=true;$('#app').hidden=false;if(!world){try{const m=await import('./world.js?v=gamepad-4');world=await m.init($('#viewport'),places,visit);$('#worldStatus').textContent='7 OPEN INTERIORS · 11 NPCs · WALK IN & EXPLORE'}catch(e){$('#worldStatus').textContent='3D unavailable. Explore all destinations using the buttons below.';console.error(e)}}}
 $('#home').onclick=()=>world?.reset();
 $('#share').onclick=async()=>{const url=new URL(location.href);url.search='';url.hash='place='+current;try{if(navigator.share)await navigator.share({title:'Best Budz World · '+places[current][0],url:url.href});else{await navigator.clipboard.writeText(url.href);toast('Destination link copied')}}catch{toast('Sharing unavailable. Copy this page address to share.')}};
 const config=await fetch('./config.json').then(r=>r.json()).catch(()=>({}));
