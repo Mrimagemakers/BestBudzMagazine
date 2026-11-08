@@ -169,14 +169,39 @@ export async function init(host, places, onVisit) {
   for(let i=0;i<3;i++){box(.25,.2,.15,places[6][3],(i-1)*.35,0,0,exhibit);sign(['Blue Dream','Sour Diesel','GDP'][i],(i-1)*.35,.22,0,.3,exhibit)}
   let lookSensitivity=Number(localStorage.getItem('bb-look-sensitivity')||1),invertLook=localStorage.getItem('bb-invert-look')==='true';
   let yaw=0,pitch=0,drag=false,lastX=0,lastY=0,travel=0,ar=false,aerial=false,snapReady=true;
+  // Lightweight local player avatar; no external model or texture downloads.
+  const avatar=new T.Group();rig.add(avatar);avatar.position.set(0,-1.7,0);
+  const avatarMat=(color)=>new T.MeshStandardMaterial({color,roughness:.8});
+  const outfit=avatarMat(localStorage.getItem('bb-avatar-color')||'#64bfa4'),skin=avatarMat('#a56f4e'),pants=avatarMat('#283c50');
+  const avPart=(geo,mat,x,y,z,parent=avatar)=>{const mesh=new T.Mesh(geo,mat);mesh.position.set(x,y,z);parent.add(mesh);return mesh};
+  avPart(new T.CapsuleGeometry(.24,.55,4,8),outfit,0,1.15,0);
+  avPart(new T.SphereGeometry(.22,12,10),skin,0,1.76,0);
+  avPart(new T.SphereGeometry(.23,12,8),avatarMat('#211d1b'),0,1.88,-.035).scale.y=.45;
+  const avatarLimbs=[];
+  for(const side of [-1,1]){
+    const arm=avPart(new T.CapsuleGeometry(.075,.42,3,6),outfit,side*.33,1.19,0);avatarLimbs.push(arm);
+    const leg=avPart(new T.CapsuleGeometry(.09,.55,3,6),pants,side*.12,.48,0);avatarLimbs.push(leg);
+    avPart(new T.BoxGeometry(.19,.12,.32),avatarMat('#172521'),side*.12,.11,-.07);
+  }
+  let thirdPerson=localStorage.getItem('bb-camera-mode')!=='first';
+  function updateCameraMode(){
+    const third=thirdPerson&&!renderer.xr.isPresenting&&!aerial;
+    avatar.visible=third;
+    const targetZ=third?3.7:0,targetY=third?1.1:0;
+    camera.position.set(0,targetY,targetZ);
+    const btn=document.querySelector('#cameraMode');if(btn)btn.textContent=thirdPerson?'Third-person: ON':'First-person: ON';
+  }
+  function setCameraMode(mode){thirdPerson=mode==='third';localStorage.setItem('bb-camera-mode',thirdPerson?'third':'first');updateCameraMode()}
+  function setAvatarColor(color){if(/^#[0-9a-f]{6}$/i.test(color)){outfit.color.set(color);localStorage.setItem('bb-avatar-color',color)}}
+  updateCameraMode();
   const keys=new Set(),held=new Map();
-  function street(){if(renderer.xr.isPresenting)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=false;rig.position.set(0,1.7,30);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0)}
-  function reset(){if(renderer.xr.isPresenting)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=true;rig.position.set(39,36,54);camera.position.set(0,0,0);yaw=.6;pitch=-.5;camera.rotation.set(pitch,yaw,0)}
+  function street(){if(renderer.xr.isPresenting)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=false;rig.position.set(0,1.7,30);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode()}
+  function reset(){if(renderer.xr.isPresenting)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=true;rig.position.set(39,36,54);camera.position.set(0,0,0);yaw=.6;pitch=-.5;camera.rotation.set(pitch,yaw,0);updateCameraMode()}
   street();
   function blocked(x,z){return homeMode?Math.abs(x)>5.8||Math.abs(z)>5.8:blockedAt(x,z,walls)}
   function move(dx,dz){const n=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.12));for(let j=0;j<n;j++){let x=T.MathUtils.clamp(rig.position.x+dx/n,-27,27);if(aerial||!blocked(x,rig.position.z))rig.position.x=x;let z=T.MathUtils.clamp(rig.position.z+dz/n,-26,33);if(aerial||!blocked(rig.position.x,z))rig.position.z=z}}
-  function visit(i,inside=false){if(ar)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}const [x,z]=coords[i];aerial=false;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z+(inside?2.9:7));if(!renderer.xr.isPresenting){yaw=0;pitch=0;camera.rotation.set(0,0,0)}}
-  function enterHome(id){if(ar)return;homeMode=true;city.visible=false;const selected=homes.enter(id);aerial=false;rig.position.set(0,1.7,4.8);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0);return selected}
+  function visit(i,inside=false){if(ar)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}const [x,z]=coords[i];aerial=false;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z+(inside?2.9:7));if(!renderer.xr.isPresenting){yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode()}}
+  function enterHome(id){if(ar)return;homeMode=true;city.visible=false;const selected=homes.enter(id);aerial=false;rig.position.set(0,1.7,4.8);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode();return selected}
   const ray=new T.Raycaster(),pointer=new T.Vector2();
   // Select a person/sign, or teleport to visible floor surfaces in VR.
   function selectRay(){const hit=ray.intersectObjects(city.children,true).find(h=>h.object!==dialogue);if(!hit||hit.distance>28)return;const data=hit.object.userData;if(data.npc){speak(data.npc,new T.Vector3(hit.point.x,0,hit.point.z));return}if(data.place!==undefined){onVisit(data.place);return}if(renderer.xr.isPresenting&&data.floor&&!blocked(hit.point.x,hit.point.z)){rig.position.set(hit.point.x,0,hit.point.z)}}
@@ -234,10 +259,14 @@ export async function init(host, places, onVisit) {
     previousButtons=pressed;
   }
   const clock=new T.Clock(),direction=new T.Vector3();let time=0;
+  document.querySelector('#cameraMode')?.addEventListener('click',()=>setCameraMode(thirdPerson?'first':'third'));
   let frames=0;renderer.setAnimationLoop(()=>{
     const dt=Math.min(clock.getDelta(),.05);time+=dt;
     if(!renderer.xr.isPresenting){gamepadInput(dt);let f=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));let s=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));const len=Math.max(1,Math.hypot(f,s));move((Math.sin(yaw)*f+Math.cos(yaw)*s)*dt*3.4/len,(Math.cos(yaw)*f-Math.sin(yaw)*s)*dt*3.4/len)}
     else if(!ar){for(const input of renderer.xr.getSession().inputSources){if(!input.gamepad)continue;const axes=input.gamepad.axes;const ax=axes.length>=4?axes[2]:axes[0]||0,az=axes.length>=4?axes[3]:axes[1]||0;if(input.handedness==='left'){renderer.xr.getCamera().getWorldDirection(direction);direction.y=0;direction.normalize();const f=Math.abs(az)>.18?-az:0,s=Math.abs(ax)>.18?ax:0;move((direction.x*f-direction.z*s)*dt*2.4,(direction.z*f+direction.x*s)*dt*2.4)}if(input.handedness==='right'){if(Math.abs(ax)<.3)snapReady=true;if(Math.abs(ax)>.7&&snapReady){rig.rotation.y-=Math.sign(ax)*Math.PI/6;snapReady=false}}}}
+    updateCameraMode();
+    const moving=keys.size>0||[...previousButtons].some(i=>i===6);
+    avatarLimbs.forEach((limb,i)=>{limb.rotation.x=T.MathUtils.lerp(limb.rotation.x,moving?Math.sin(time*9+(i%2)*Math.PI)*.35:0,.15)});
     for(const n of npcs){if(n.walking){const t=time*.3+n.phase;n.root.position.z=n.startZ+Math.sin(t)*3;n.root.rotation.y=Math.cos(t)>=0?0:Math.PI;n.limbs.forEach((l,j)=>l.rotation.x=Math.sin(time*5+n.phase)*(j%2?.3:.22)*(j<2?1:-1))}else{n.root.position.y=Math.sin(time*1.4+n.phase)*.012;n.limbs[0].rotation.z=.08+Math.sin(time+n.phase)*.04}}
     if(dialogue.visible){dialogue.lookAt(camera.getWorldPosition(direction));if(performance.now()>dialogueUntil)dialogue.visible=false}
     renderer.render(scene,camera);
@@ -245,5 +274,5 @@ export async function init(host, places, onVisit) {
   });
   new ResizeObserver(()=>{if(!host.clientWidth||!host.clientHeight)return;camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix();renderer.setSize(host.clientWidth,host.clientHeight)}).observe(host);
   renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();document.querySelector('#worldStatus').textContent='3D paused. Reload to restore, or use destination buttons.'});
-  return {reset,visit,enter:i=>visit(i,true),enterHome,setLookSettings:(sensitivity,inverted)=>{lookSensitivity=sensitivity;invertLook=inverted}};
+  return {reset,visit,enter:i=>visit(i,true),enterHome,setCameraMode,setAvatarColor,setLookSettings:(sensitivity,inverted)=>{lookSensitivity=sensitivity;invertLook=inverted}};
 }
