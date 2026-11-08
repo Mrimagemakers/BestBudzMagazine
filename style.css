@@ -122,3 +122,6 @@ body.xr-session-active .worldbar,body.xr-session-active header,body.xr-session-a
  #xr{flex:0 0 auto!important}
  #talk{max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
+
+/* Home entertainment portal */
+.mediaActions{display:grid;gap:10px;margin:18px 0}.mediaActions a{display:block;background:#244435;border:1px solid #b9ff7260;border-radius:12px;padding:14px 16px;color:#d8ffad!important;text-decoration:none;font-weight:700}.mediaActions a:focus-visible{outline:3px solid #b9ff72}
