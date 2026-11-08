@@ -24,13 +24,22 @@ function homeMediaPanel(h){
 }
 homeSection.addEventListener('click',e=>{const b=e.target.closest('[data-home]');if(!b)return;const h=world?.enterHome(b.dataset.home);if(h){$('#viewport').scrollIntoView({block:'start',behavior:'smooth'});homeMediaPanel(h)}});
 
+const controlsSection=document.createElement('section');controlsSection.className='destinations controls-settings';controlsSection.innerHTML='<span class="eyebrow">GAMEPLAY SETTINGS</span><h2>Navigation controls</h2><p>Xbox / PlayStation: left stick to move, right stick to look, A / Cross to interact, B / Circle to close panels. Keyboard: WASD to walk, drag to look.</p><label for="lookSensitivity">Look sensitivity <output id="sensitivityValue">1.0×</output></label><input id="lookSensitivity" type="range" min="0.3" max="2.5" step="0.1"><label class="check"><input id="invertLook" type="checkbox"> Invert vertical look</label><button id="resetControls" type="button">Restore defaults</button>';
+homeSection.after(controlsSection);
+const sensitivityInput=$('#lookSensitivity'),invertInput=$('#invertLook'),sensitivityValue=$('#sensitivityValue');
+sensitivityInput.value=localStorage.getItem('bb-look-sensitivity')||'1';
+invertInput.checked=localStorage.getItem('bb-invert-look')==='true';
+function applyLook(){const value=Number(sensitivityInput.value);sensitivityValue.textContent=value.toFixed(1)+'×';localStorage.setItem('bb-look-sensitivity',String(value));localStorage.setItem('bb-invert-look',String(invertInput.checked));world?.setLookSettings(value,invertInput.checked)}
+sensitivityInput.addEventListener('input',applyLook);invertInput.addEventListener('change',applyLook);
+$('#resetControls').onclick=()=>{sensitivityInput.value='1';invertInput.checked=false;applyLook()};
+applyLook();
 $('#exploreMenu').onclick=()=>document.querySelector('.home-selector')?.scrollIntoView({behavior:'smooth',block:'start'});
 $('#places').onclick=e=>{const b=e.target.closest('[data-place]');if(b)visit(+b.dataset.place)};
 $('#closePanel').onclick=()=>$('#panel').hidden=true;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#panel').hidden=true});
 $('#exit').onclick=()=>{sessionStorage.removeItem('bb-age');location.reload()};
 $('#ageForm').onsubmit=e=>{e.preventDefault();if(!isAdult($('#dob').value)||!$('#attest').checked){$('#ageError').textContent='Entry requires confirmation that you are at least 21.';return}sessionStorage.setItem('bb-age','yes');enter().then(openSharedPlace)};
-async function enter(){$('#gate').hidden=true;$('#app').hidden=false;if(!world){try{const m=await import('./world.js?v=gamepad-4');world=await m.init($('#viewport'),places,visit);$('#worldStatus').textContent='7 OPEN INTERIORS · 11 NPCs · WALK IN & EXPLORE'}catch(e){$('#worldStatus').textContent='3D unavailable. Explore all destinations using the buttons below.';console.error(e)}}}
+async function enter(){$('#gate').hidden=true;$('#app').hidden=false;if(!world){try{const m=await import('./world.js?v=controls-5');world=await m.init($('#viewport'),places,visit);$('#worldStatus').textContent='7 OPEN INTERIORS · 11 NPCs · WALK IN & EXPLORE'}catch(e){$('#worldStatus').textContent='3D unavailable. Explore all destinations using the buttons below.';console.error(e)}}}
 $('#home').onclick=()=>world?.reset();
 $('#share').onclick=async()=>{const url=new URL(location.href);url.search='';url.hash='place='+current;try{if(navigator.share)await navigator.share({title:'Best Budz World · '+places[current][0],url:url.href});else{await navigator.clipboard.writeText(url.href);toast('Destination link copied')}}catch{toast('Sharing unavailable. Copy this page address to share.')}};
 const config=await fetch('./config.json').then(r=>r.json()).catch(()=>({}));
