@@ -24,3 +24,6 @@ All seven venues now have open, walkable doorways, window/wall collisions and fu
 Seven stationary hosts and four walking visitors have scripted conversations. Click/tap a character or approach and press **E / Talk to NPC**. Dialogue is displayed in the 3D world for VR users. VR adds left-thumbstick movement, right-thumbstick snap turns, and trigger selection of visible floors for teleporting. Hardware testing is still required.
 
 Brick, stone, wood and plaster textures are locally generated with bump mapping. The scene adds sunlight shadows, glass, landscaping, furniture and articulated NPCs. These are procedural assets, not scanned photorealistic buildings or humans. `npm test` includes doorway routes, wall/window collision and unobstructed plaza paths.
+
+## Player homes expansion
+The next release is tracked in [GitHub issue #2](https://github.com/Mrimagemakers/BestBudzMagazine/issues/2): verified player accounts, custom avatars, five starter homes, WebXR VR/AR interactions, Stoner TV and Turn Up Music integration. The confirmed Turn Up Music website is https://turnupmusic.online; a playable stream or embeddable player must be verified separately. These features are planned and not yet included in this static release.
