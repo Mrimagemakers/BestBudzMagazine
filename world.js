@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {buildHomes,HOMES} from './homes.js';
 import {WORLD_COORDS,buildingWalls,blockedAt} from './logic.js';
 import {VRButton} from 'three/addons/webxr/VRButton.js';
 import {ARButton} from 'three/addons/webxr/ARButton.js';
@@ -25,6 +26,7 @@ export async function init(host, places, onVisit) {
   Object.assign(sun.shadow.camera, {left:-48,right:48,top:48,bottom:-48,near:1,far:130});
   sun.shadow.bias = -.0004; sun.shadow.normalBias = .04; scene.add(sun);
   const city = new T.Group(); scene.add(city);
+  const homes=buildHomes(scene);let homeMode=false;
   const walls = [], npcs = [], seats = [];
   const coords = WORLD_COORDS;
   let seed = 71;
@@ -166,12 +168,13 @@ export async function init(host, places, onVisit) {
   for(let i=0;i<3;i++){box(.25,.2,.15,places[6][3],(i-1)*.35,0,0,exhibit);sign(['Blue Dream','Sour Diesel','GDP'][i],(i-1)*.35,.22,0,.3,exhibit)}
   let yaw=0,pitch=0,drag=false,lastX=0,lastY=0,travel=0,ar=false,aerial=false,snapReady=true;
   const keys=new Set(),held=new Map();
-  function street(){if(renderer.xr.isPresenting)return;aerial=false;rig.position.set(0,1.7,30);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0)}
-  function reset(){if(renderer.xr.isPresenting)return;aerial=true;rig.position.set(39,36,54);camera.position.set(0,0,0);yaw=.6;pitch=-.5;camera.rotation.set(pitch,yaw,0)}
+  function street(){if(renderer.xr.isPresenting)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=false;rig.position.set(0,1.7,30);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0)}
+  function reset(){if(renderer.xr.isPresenting)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=true;rig.position.set(39,36,54);camera.position.set(0,0,0);yaw=.6;pitch=-.5;camera.rotation.set(pitch,yaw,0)}
   street();
-  function blocked(x,z){return blockedAt(x,z,walls)}
+  function blocked(x,z){return homeMode?Math.abs(x)>5.8||Math.abs(z)>5.8:blockedAt(x,z,walls)}
   function move(dx,dz){const n=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.12));for(let j=0;j<n;j++){let x=T.MathUtils.clamp(rig.position.x+dx/n,-27,27);if(aerial||!blocked(x,rig.position.z))rig.position.x=x;let z=T.MathUtils.clamp(rig.position.z+dz/n,-26,33);if(aerial||!blocked(rig.position.x,z))rig.position.z=z}}
-  function visit(i,inside=false){if(ar)return;const [x,z]=coords[i];aerial=false;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z+(inside?2.9:7));if(!renderer.xr.isPresenting){yaw=0;pitch=0;camera.rotation.set(0,0,0)}}
+  function visit(i,inside=false){if(ar)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}const [x,z]=coords[i];aerial=false;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z+(inside?2.9:7));if(!renderer.xr.isPresenting){yaw=0;pitch=0;camera.rotation.set(0,0,0)}}
+  function enterHome(id){if(ar)return;homeMode=true;city.visible=false;const selected=homes.enter(id);aerial=false;rig.position.set(0,1.7,4.8);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0);return selected}
   const ray=new T.Raycaster(),pointer=new T.Vector2();
   // Select a person/sign, or teleport to visible floor surfaces in VR.
   function selectRay(){const hit=ray.intersectObjects(city.children,true).find(h=>h.object!==dialogue);if(!hit||hit.distance>28)return;const data=hit.object.userData;if(data.npc){speak(data.npc,new T.Vector3(hit.point.x,0,hit.point.z));return}if(data.place!==undefined){onVisit(data.place);return}if(renderer.xr.isPresenting&&data.floor&&!blocked(hit.point.x,hit.point.z)){rig.position.set(hit.point.x,0,hit.point.z)}}
@@ -200,7 +203,7 @@ export async function init(host, places, onVisit) {
     }
     if(!active)hiddenForXR.clear();
   }
-  renderer.xr.addEventListener('sessionstart',()=>{setImmersiveLayout(true);ar=renderer.xr.getSession().environmentBlendMode!=='opaque';city.visible=!ar;exhibit.visible=ar;aerial=false;rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);if(ar){scene.background=null;scene.fog=null;exhibit.position.set(0,1.2,-1)}});
+  renderer.xr.addEventListener('sessionstart',()=>{setImmersiveLayout(true);ar=renderer.xr.getSession().environmentBlendMode!=='opaque';city.visible=!ar;exhibit.visible=ar;aerial=false;if(homeMode){homeMode=false;homes.leave()}rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);if(ar){scene.background=null;scene.fog=null;exhibit.position.set(0,1.2,-1)}});
   renderer.xr.addEventListener('sessionend',()=>{setImmersiveLayout(false);ar=false;city.visible=true;exhibit.visible=false;rig.rotation.y=0;scene.background=sky;scene.fog=new T.Fog(sky,55,145);street()});
   const clock=new T.Clock(),direction=new T.Vector3();let time=0;
   renderer.setAnimationLoop(()=>{
@@ -213,5 +216,5 @@ export async function init(host, places, onVisit) {
   });
   new ResizeObserver(()=>{if(!host.clientWidth||!host.clientHeight)return;camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix();renderer.setSize(host.clientWidth,host.clientHeight)}).observe(host);
   renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();document.querySelector('#worldStatus').textContent='3D paused. Reload to restore, or use destination buttons.'});
-  return {reset,visit,enter:i=>visit(i,true)};
+  return {reset,visit,enter:i=>visit(i,true),enterHome};
 }
