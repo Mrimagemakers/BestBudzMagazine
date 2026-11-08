@@ -125,3 +125,5 @@ body.xr-session-active .worldbar,body.xr-session-active header,body.xr-session-a
 
 /* Home entertainment portal */
 .mediaActions{display:grid;gap:10px;margin:18px 0}.mediaActions a{display:block;background:#244435;border:1px solid #b9ff7260;border-radius:12px;padding:14px 16px;color:#d8ffad!important;text-decoration:none;font-weight:700}.mediaActions a:focus-visible{outline:3px solid #b9ff72}
+
+.controller-status{font-size:10px;color:#b9ff72;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis;border:1px solid #b9ff7244;padding:8px;border-radius:12px}@media(max-width:700px){.controller-status{position:fixed;top:60px;right:10px;z-index:4;background:#0b1b15c9;font-size:9px;max-width:155px;padding:5px 8px;pointer-events:none}}
