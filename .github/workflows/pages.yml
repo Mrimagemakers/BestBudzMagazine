@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: '22'
       - run: npm test
-      - run: node --check app.js && node --check player-auth.js && node --check world.js && node --check homes.js && node --check ultra.js && node --check xr-controls.js && node --check server/server.js
+      - run: node --check app.js && node --check player-auth.js && node --check world.js && node --check model-assets.js && node --check homes.js && node --check ultra.js && node --check xr-controls.js && node --check server/server.js
   deploy:
     if: github.ref == 'refs/heads/main'
     needs: validate
@@ -34,8 +34,12 @@ jobs:
       - name: Prepare public files only
         run: |
           mkdir _site
-          cp index.html credits.html style.css app.js player-auth.js world.js logic.js homes.js ultra.js xr-controls.js config.json _site/
+          cp index.html credits.html style.css app.js player-auth.js world.js model-assets.js logic.js homes.js ultra.js xr-controls.js config.json _site/
           cp -r assets _site/
+          mkdir -p _site/assets/models
+          unzip -jo BestBudz_Converted_Models_Stage1.zip distressed_house.glb vela_architecture.glb -d _site/assets/models
+          test -s _site/assets/models/distressed_house.glb
+          test -s _site/assets/models/vela_architecture.glb
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
