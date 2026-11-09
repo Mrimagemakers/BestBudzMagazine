@@ -25,6 +25,9 @@ Seven stationary hosts and four walking visitors have scripted conversations. Cl
 
 Brick, stone, wood and plaster textures are locally generated with bump mapping. The scene adds sunlight shadows, glass, landscaping, furniture and articulated NPCs. These are procedural assets, not scanned photorealistic buildings or humans. `npm test` includes doorway routes, wall/window collision and unobstructed plaza paths.
 
+## Player homes expansion
+The next release is tracked in [GitHub issue #2](https://github.com/Mrimagemakers/BestBudzMagazine/issues/2): verified player accounts, custom avatars, five starter homes, WebXR VR/AR interactions, Stoner TV and Turn Up Music integration. The confirmed Turn Up Music website is https://turnupmusic.online; a playable stream or embeddable player must be verified separately. These features are planned and not yet included in this static release.
+
 ## Districts update: Budz Marketplace, transit portals, AR tabletop
 **Budz Marketplace** is a second district north of the Central Plaza, reached on foot through two gateways behind the Lounge or by stepping into the glowing transit ring. A string-lit boulevard holds five walk-in storefronts (Dispensary Showroom, Accessories, Fashion Boutique, Best Budz Shop, Art Gallery), the Budz Garden pocket park, a host in every shop and three walking regulars.
 

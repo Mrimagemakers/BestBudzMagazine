@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {buildHomes,HOMES} from './homes.js?v=textures-7';
 import {WORLD_COORDS,buildingWalls,blockedAt,walkable,districtAt,portalAt,PORTALS,MARKET_LAYOUT,toWorld} from './logic.js';
 import {buildMarketplace} from './marketplace.js';
 import {VRButton} from 'three/addons/webxr/VRButton.js';
@@ -13,33 +14,77 @@ export async function init(host, places, onVisit, hooks = {}) {
   camera.rotation.order = 'YXZ';
   const rig = new T.Group(); rig.add(camera); scene.add(rig);
   const renderer = new T.WebGLRenderer({antialias:true, alpha:true});
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+  const mobileDevice=matchMedia('(max-width: 800px), (pointer: coarse)').matches;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, mobileDevice?1:1.5));
   renderer.setSize(host.clientWidth, host.clientHeight);
   renderer.xr.enabled = true;
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = !mobileDevice; renderer.shadowMap.type = T.PCFSoftShadowMap;
   renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
   host.append(renderer.domElement);
   scene.add(new T.HemisphereLight(0xe7f2ff, 0x76634b, 2.1));
   const sun = new T.DirectionalLight(0xffe3b3, 3.4);
   sun.position.set(-30, 45, 25); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.mapSize.set(mobileDevice?512:1024,mobileDevice?512:1024);
   Object.assign(sun.shadow.camera, {left:-48,right:48,top:48,bottom:-48,near:1,far:130});
   sun.shadow.bias = -.0004; sun.shadow.normalBias = .04; scene.add(sun); scene.add(sun.target);
   const city = new T.Group(); scene.add(city);
+  const homes=buildHomes(scene);let homeMode=false;
   const walls = [], npcs = [], seats = [];
   const coords = WORLD_COORDS;
   let seed = 71;
   const rand = () => {seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296};
+  // Seeded procedural PBR-style surfaces: diffuse, micro-normal and roughness maps.
+  // No external asset dependency; textures remain available offline after load.
+  const surfaceCache = new Map();
   function surface(kind, base) {
-    const c = document.createElement('canvas'); c.width = c.height = 256;
-    const g = c.getContext('2d'); g.fillStyle = base; g.fillRect(0,0,256,256);
-    for(let i=0;i<6500;i++){g.fillStyle = `rgba(${rand()>.5?'255,255,255':'0,0,0'},${rand()*.1})`;g.fillRect(rand()*256,rand()*256,rand()*3+1,rand()*2+1)}
-    if(kind==='brick')for(let y=0;y<256;y+=32){g.fillStyle='#b6ac99';g.fillRect(0,y,256,2);for(let x=(y%64?32:0);x<256;x+=64)g.fillRect(x,y,2,32)}
-    if(kind==='wood')for(let y=0;y<256;y+=32){g.fillStyle='#33271b';g.fillRect(0,y,256,2);for(let j=0;j<16;j++){g.strokeStyle='rgba(36,24,12,.18)';g.beginPath();g.moveTo(0,y+rand()*30);g.bezierCurveTo(60,y+rand()*30,160,y+rand()*30,256,y+rand()*30);g.stroke()}}
-    if(kind==='tile'){g.strokeStyle='#7a8079';g.lineWidth=2;for(let y=0;y<256;y+=64){g.strokeRect(0,y,128,64);g.strokeRect(128,y,128,64)}}
-    const map = new T.CanvasTexture(c);map.colorSpace=T.SRGBColorSpace;map.wrapS=map.wrapT=T.RepeatWrapping;map.repeat.set(2,2);map.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
-    const bump=map.clone();bump.colorSpace=T.NoColorSpace;
-    return new T.MeshStandardMaterial({map,bumpMap:bump,bumpScale:kind==='wood'?.025:.065,roughness:.88});
+    const key = kind + ':' + base;
+    if(surfaceCache.has(key)) return surfaceCache.get(key);
+    const size = mobileDevice?128:256;
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d');
+    g.fillStyle = base; g.fillRect(0, 0, size, size);
+    const height = new Uint8ClampedArray(size * size);
+    const grain = (x,y,v) => { const ix = ((y+size)%size)*size + ((x+size)%size); height[ix] = Math.max(0,Math.min(255,v)); };
+    for(let y=0;y<size;y++) for(let x=0;x<size;x++) {
+      const noise = rand();
+      let h = 120 + (noise-.5)*45;
+      if(kind==='brick') {
+        const row=Math.floor(y/64), mortar=(y%64<5)||((x+(row%2)*64)%128<5);
+        h=mortar?48:150+(noise-.5)*55;
+      } else if(kind==='wood') {
+        const seam=y%64<3, knot=Math.sin(x*.035+Math.sin(y*.12)*2)*9;
+        h=seam?50:135+knot+(noise-.5)*22;
+      } else if(kind==='tile') {
+        const joint=(y%128<4)||((x+(Math.floor(y/128)%2)*128)%256<4);
+        h=joint?52:160+(noise-.5)*18;
+      } else h=135+(noise-.5)*35;
+      grain(x,y,h);
+    }
+    const image=g.getImageData(0,0,size,size), data=image.data;
+    const baseColor=new T.Color(base);
+    const r=baseColor.r*255, gg=baseColor.g*255, b=baseColor.b*255;
+    for(let y=0;y<size;y++) for(let x=0;x<size;x++) {
+      const i=y*size+x, o=i*4, v=height[i], factor=.75+v/510;
+      data[o]=Math.min(255,r*factor); data[o+1]=Math.min(255,gg*factor); data[o+2]=Math.min(255,b*factor);data[o+3]=255;
+      if(v<65){data[o]*=.67;data[o+1]*=.67;data[o+2]*=.67;}
+    }
+    g.putImageData(image,0,0);
+    const n=document.createElement('canvas');n.width=n.height=size;
+    const ng=n.getContext('2d'), nd=ng.createImageData(size,size);
+    const rough=document.createElement('canvas');rough.width=rough.height=size;
+    const rg=rough.getContext('2d'), rd=rg.createImageData(size,size);
+    const sample=(x,y)=>height[((y+size)%size)*size+((x+size)%size)];
+    for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+      const o=(y*size+x)*4, dx=(sample(x+1,y)-sample(x-1,y))/255,dy=(sample(x,y+1)-sample(x,y-1))/255;
+      const nx=-dx*2.2,ny=-dy*2.2,nz=1,inv=1/Math.hypot(nx,ny,nz);
+      nd.data[o]=(nx*inv*.5+.5)*255;nd.data[o+1]=(ny*inv*.5+.5)*255;nd.data[o+2]=(nz*inv*.5+.5)*255;nd.data[o+3]=255;
+      const rv=kind==='wood'?165:kind==='tile'?195:kind==='brick'?225:230;
+      rd.data[o]=rd.data[o+1]=rd.data[o+2]=Math.min(255,rv+(sample(x,y)-128)*.14);rd.data[o+3]=255;
+    }
+    ng.putImageData(nd,0,0);rg.putImageData(rd,0,0);
+    const texture=(canvas,srgb=false)=>{const t=new T.CanvasTexture(canvas);t.colorSpace=srgb?T.SRGBColorSpace:T.NoColorSpace;t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(2,2);t.anisotropy=Math.min(mobileDevice?2:4,renderer.capabilities.getMaxAnisotropy());return t;};
+    const material=new T.MeshStandardMaterial(mobileDevice?{map:texture(c,true),roughness:.85,metalness:0}:{map:texture(c,true),normalMap:texture(n),normalScale:new T.Vector2(.48,.48),roughnessMap:texture(rough),roughness:1,metalness:0});
+    surfaceCache.set(key,material);return material;
   }
   const brick=surface('brick','#9e7962'), stone=surface('tile','#b6b6a5'), wood=surface('wood','#917044'), plaster=surface('noise','#e3d6bd');
   const metal=new T.MeshStandardMaterial({color:0x344940,metalness:.65,roughness:.32});
@@ -52,6 +97,59 @@ export async function init(host, places, onVisit, hooks = {}) {
   function sphere(r,m,x,y,z,parent=city){return mesh(new T.SphereGeometry(r,12,8),m,x,y,z,parent)}
   function sign(text,x,y,z,width=5,parent=city){const c=document.createElement('canvas');c.width=1024;c.height=160;const g=c.getContext('2d');g.fillStyle='#173c30';g.fillRect(0,0,1024,160);g.strokeStyle='#b5c78e';g.strokeRect(8,8,1008,144);g.fillStyle='#f8ebcc';g.textAlign='center';g.font='500 48px sans-serif';g.fillText(text,512,98,960);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;const o=mesh(new T.PlaneGeometry(width,width*160/1024),new T.MeshBasicMaterial({map:tex,side:T.DoubleSide}),x,y,z,parent);o.castShadow=false;return o}
   box(96,.2,100,surface('noise','#6b7952'),0,-.16,0);
+  // Outdoor landscaping: instanced grass blades with color variation.
+  // Single draw call keeps dense planting affordable on phones and Quest.
+  const grassCount=mobileDevice?2800:9000;
+  const bladeGeo=new T.ConeGeometry(.045,.36,3);
+  bladeGeo.translate(0,.18,0);
+  const bladeMat=new T.MeshStandardMaterial({color:0x91a85c,roughness:1,side:T.DoubleSide});
+  const blades=new T.InstancedMesh(bladeGeo,bladeMat,grassCount);
+  blades.castShadow=false;blades.receiveShadow=false;
+  const dummy=new T.Object3D(),grassColor=new T.Color();
+  let planted=0,attempts=0;
+  while(planted<grassCount&&attempts<grassCount*12){
+    attempts++;
+    const x=(rand()-.5)*91,z=(rand()-.5)*95;
+    if(Math.abs(x)<28&&z>-30&&z<35)continue; // keep roads and venues clear
+    dummy.position.set(x,-.03,z);dummy.rotation.set(0,rand()*6.28,(rand()-.5)*.3);
+    dummy.scale.set(.7+rand()*.9,.65+rand()*1.6,.7+rand()*.9);
+    dummy.updateMatrix();blades.setMatrixAt(planted,dummy.matrix);
+    grassColor.setHSL(.23+rand()*.08,.27+rand()*.26,.24+rand()*.23);
+    blades.setColorAt(planted,grassColor);planted++;
+  }
+  blades.count=planted;blades.instanceMatrix.needsUpdate=true;city.add(blades);
+  // Layered trees with tapered trunks, branches, and non-uniform leaf clusters.
+  const bark=surface('wood','#64513a');
+  const leafMats=[0x385e35,0x47783f,0x5a8747,0x718c49].map(c=>new T.MeshStandardMaterial({color:c,roughness:1,flatShading:true}));
+  const trunkGeo=new T.CylinderGeometry(.16,.29,3.8,7);
+  const branchGeo=new T.CylinderGeometry(.055,.12,1.7,6);
+  const canopyGeo=new T.IcosahedronGeometry(1,1);
+  function tree(x,z,height=1){
+    const group=new T.Group();group.position.set(x,0,z);group.scale.setScalar(height);city.add(group);
+    const trunk=mesh(trunkGeo,bark,0,1.9,0,group);
+    for(let j=0;j<5;j++){
+      const angle=j*Math.PI*2/5+rand()*.25,level=2.4+(j%3)*.48;
+      const branch=mesh(branchGeo,bark,Math.cos(angle)*.45,level,Math.sin(angle)*.45,group);
+      branch.rotation.z=-Math.cos(angle)*.7;branch.rotation.x=Math.sin(angle)*.7;
+    }
+    for(let j=0;j<10;j++){
+      const angle=j*2.39996,ring=j%3,dist=.65+ring*.22;
+      const leaf=mesh(canopyGeo,leafMats[j%leafMats.length],Math.cos(angle)*dist,3.8+(j%4)*.43,Math.sin(angle)*dist,group);
+      leaf.scale.set(.85+rand()*.38,.95+rand()*.5,.85+rand()*.38);
+      leaf.castShadow=!mobileDevice;
+    }
+  }
+  for(let i=0;i<26;i++){
+    const x=i%2===0?-35-rand()*9:35+rand()*9,z=-42+Math.floor(i/2)*7+rand()*2;
+    tree(x,z,.75+rand()*.6);
+  }
+  for(let i=0;i<14;i++){const x=(rand()-.5)*90,z=i%2===0?-39-rand()*7:40+rand()*7;tree(x,z,.7+rand()*.5)}
+  // Architectural trim and street detail to break up flat facade geometry.
+  const concrete=surface('tile','#8e9290');
+  for(let z=-29;z<35;z+=7){
+    box(1.6,.055,1.5,concrete,-26.3,.01,z);
+    box(1.6,.055,1.5,concrete,26.3,.01,z);
+  }
   const ground=box(53,.08,60,stone,0,-.04,3);ground.userData.floor=true;
   // Narrow stone joints and raised planting beds break up the paved plaza.
   for(let z=-26;z<34;z+=4)box(53,.005,.025,0x868f82,0,.005,z);
@@ -77,6 +175,11 @@ export async function init(host, places, onVisit, hooks = {}) {
     box(10,1,.3,plaster,x,3.9,z+4.5);
     box(10.7,.24,9.7,plaster,x,4.5,z);
     box(10.7,.12,1.3,accent,x,3.5,z+5);
+    // Raised cornice, corner pilasters, and contrasting facade base.
+    box(11,.16,10.1,concrete,x,4.64,z);
+    for(const dx of [-4.85,4.85])box(.25,4.3,.35,concrete,x+dx,2.15,z+4.65);
+    for(const dx of [-3.2,3.2])box(3.5,.18,.36,concrete,x+dx,.18,z+4.66);
+    box(10.5,.12,.5,metal,x,3.57,z+4.85);
     const title=sign(p[0].toUpperCase(),x,3.92,z+4.7,7);title.userData.place=i;
     sign('OPEN · WALK INSIDE',x,2.85,z+4.65,2.5);
     box(2.6,.015,1,0x405b48,x,.055,z+4.7);
@@ -94,11 +197,6 @@ export async function init(host, places, onVisit, hooks = {}) {
     if(i===6){for(let k=0;k<3;k++){const dx=(k-1)*2.8;box(1,.9,.8,stone,x+dx,.5,z-2);plant(x+dx,z-2,.7);sign(['BLUE DREAM','SOUR DIESEL','GDP'][k],x+dx,.75,z-1.55,1);const plaque=box(1,.2,.02,accent,x+dx,1.45,z-1.6);plaque.userData.place=6}sign('EDUCATIONAL EXHIBITS · BATCH UNVERIFIED',x,2.1,z-4.3,7)}
     createNPC(x+3.4,z+1.8,i,false);
   });
-  for(let i=0;i<18;i++){
-    const x=i%2?32:-32,z=-28+Math.floor(i/2)*7;
-    cyl(.23,3.4,wood,x,1.7,z);
-    for(let j=0;j<4;j++){const crown=sphere(1.5,0x4f7048,x+(rand()-.5)*1.3,3.7+rand(),z+(rand()-.5)*1.3);crown.scale.y=1.3}
-  }
   for(const z of [-5,14,31])for(const x of [-8,8]){cyl(.06,3.7,metal,x,1.85,z);sphere(.18,new T.MeshStandardMaterial({color:0xffe9b5,emissive:0xffcb76,emissiveIntensity:.6}),x,3.7,z);box(1.7,.16,.5,wood,x,.55,z+1);box(.1,.55,.4,metal,x-.6,.25,z+1);box(.1,.55,.4,metal,x+.6,.25,z+1)}
   // Articulated residents: seven hosts and four walking visitors.
   function createNPC(x,z,index,walking,custom=null,rot=0){
@@ -129,16 +227,44 @@ export async function init(host, places, onVisit, hooks = {}) {
   const reticle=new T.Mesh(new T.RingGeometry(.09,.12,32).rotateX(-Math.PI/2),new T.MeshBasicMaterial({color:0xd5ee83}));reticle.matrixAutoUpdate=false;reticle.visible=false;scene.add(reticle);
   let arScale=.008,arPlaced=false,hitSource=null,hitRequested=false;
   const arHint=t=>{const h=document.querySelector('#arHint');if(h)h.textContent=t};
+  let lookSensitivity=Number(localStorage.getItem('bb-look-sensitivity')||1),invertLook=localStorage.getItem('bb-invert-look')==='true';
   let yaw=0,pitch=0,drag=false,lastX=0,lastY=0,travel=0,ar=false,aerial=false,snapReady=true;
+  // Lightweight local player avatar; no external model or texture downloads.
+  const avatar=new T.Group();rig.add(avatar);avatar.position.set(0,-1.7,0);
+  const avatarMat=(color)=>new T.MeshStandardMaterial({color,roughness:.8});
+  const outfit=avatarMat(localStorage.getItem('bb-avatar-color')||'#64bfa4'),skin=avatarMat('#a56f4e'),pants=avatarMat('#283c50');
+  const avPart=(geo,mat,x,y,z,parent=avatar)=>{const mesh=new T.Mesh(geo,mat);mesh.position.set(x,y,z);parent.add(mesh);return mesh};
+  avPart(new T.CapsuleGeometry(.24,.55,4,8),outfit,0,1.15,0);
+  avPart(new T.SphereGeometry(.22,12,10),skin,0,1.76,0);
+  avPart(new T.SphereGeometry(.23,12,8),avatarMat('#211d1b'),0,1.88,-.035).scale.y=.45;
+  const avatarLimbs=[];
+  for(const side of [-1,1]){
+    const arm=avPart(new T.CapsuleGeometry(.075,.42,3,6),outfit,side*.33,1.19,0);avatarLimbs.push(arm);
+    const leg=avPart(new T.CapsuleGeometry(.09,.55,3,6),pants,side*.12,.48,0);avatarLimbs.push(leg);
+    avPart(new T.BoxGeometry(.19,.12,.32),avatarMat('#172521'),side*.12,.11,-.07);
+  }
+  let thirdPerson=localStorage.getItem('bb-camera-mode')!=='first';
+  function updateCameraMode(){
+    const third=thirdPerson&&!renderer.xr.isPresenting&&!aerial;
+    avatar.visible=third;
+    const dist=third?3.7:0,targetY=third?1.1:0;
+    // Orbit behind the avatar along the current look direction.
+    camera.position.set(Math.sin(yaw)*dist,targetY,Math.cos(yaw)*dist);avatar.rotation.y=yaw;
+    const btn=document.querySelector('#cameraMode');if(btn)btn.textContent=thirdPerson?'Third-person: ON':'First-person: ON';
+  }
+  function setCameraMode(mode){thirdPerson=mode==='third';localStorage.setItem('bb-camera-mode',thirdPerson?'third':'first');updateCameraMode()}
+  function setAvatarColor(color){if(/^#[0-9a-f]{6}$/i.test(color)){outfit.color.set(color);localStorage.setItem('bb-avatar-color',color)}}
+  updateCameraMode();
   const keys=new Set(),held=new Map();
-  function street(){if(renderer.xr.isPresenting)return;aerial=false;rig.position.set(0,1.7,30);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0)}
-  function reset(){if(renderer.xr.isPresenting)return;aerial=true;rig.position.set(39,36,54);camera.position.set(0,0,0);yaw=.6;pitch=-.5;camera.rotation.set(pitch,yaw,0)}
+  function street(){if(renderer.xr.isPresenting)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=false;rig.position.set(0,1.7,30);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode()}
+  function reset(){if(renderer.xr.isPresenting)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=true;rig.position.set(39,36,54);camera.position.set(0,0,0);yaw=.6;pitch=-.5;camera.rotation.set(pitch,yaw,0);updateCameraMode()}
   street();
-  function blocked(x,z){return blockedAt(x,z,walls)}
-  const ok=(x,z)=>aerial?(x>-30&&x<30&&z>-98&&z<36):(walkable(x,z)&&!blocked(x,z));
+  function blocked(x,z){return homeMode?Math.abs(x)>5.8||Math.abs(z)>5.8:blockedAt(x,z,walls)}
+  const ok=(x,z)=>aerial?(x>-30&&x<30&&z>-98&&z<36):homeMode?!blocked(x,z):(walkable(x,z)&&!blocked(x,z));
   function move(dx,dz){const n=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.12));for(let j=0;j<n;j++){const x=rig.position.x+dx/n;if(ok(x,rig.position.z))rig.position.x=x;const z=rig.position.z+dz/n;if(ok(rig.position.x,z))rig.position.z=z}}
-  function visit(i,inside=false){if(ar)return;const [x,z]=coords[i];aerial=false;rig.rotation.y=0;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z+(inside?2.9:7));if(!renderer.xr.isPresenting){yaw=0;pitch=0;camera.rotation.set(0,0,0)}}
-  function placeAt(x,z,y=0){aerial=false;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z);rig.rotation.y=0;if(!renderer.xr.isPresenting){yaw=y;pitch=0;camera.rotation.set(0,y,0)}else rig.rotation.y=y}
+  function visit(i,inside=false){if(ar)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}const [x,z]=coords[i];aerial=false;rig.rotation.y=0;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z+(inside?2.9:7));if(!renderer.xr.isPresenting){yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode()}}
+  function enterHome(id){if(ar)return;homeMode=true;city.visible=false;const selected=homes.enter(id);aerial=false;rig.position.set(0,1.7,4.8);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode();return selected}
+  function placeAt(x,z,y=0){if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=false;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z);rig.rotation.y=0;if(!renderer.xr.isPresenting){yaw=y;pitch=0;camera.rotation.set(0,y,0);updateCameraMode()}else rig.rotation.y=y}
   // Transit: from a portal id, jump to the connected portal's arrival point.
   let portalArmed=true;
   function transit(fromId){const from=PORTALS.find(p=>p.id===fromId),to=PORTALS.find(p=>p.id===from.to);portalArmed=false;placeAt(to.arrive.x,to.arrive.z,to.arrive.yaw);document.querySelector('#worldStatus').textContent='Arrived: '+to.label}
@@ -151,7 +277,7 @@ export async function init(host, places, onVisit, hooks = {}) {
   // Select a person/sign, or teleport to visible floor surfaces in VR.
   function selectRay(){const hit=ray.intersectObjects(city.children,true).find(h=>h.object!==dialogue);if(!hit||hit.distance>28)return;const data=hit.object.userData;if(data.product){focusProduct(...data.product);hooks.onProduct?.(...data.product);return}if(data.shop!==undefined){hooks.onShop?.(data.shop);return}if(data.portal){transit(data.portal);return}if(data.npc){speak(data.npc,new T.Vector3(hit.point.x,0,hit.point.z));return}if(data.place!==undefined){onVisit(data.place);return}if(renderer.xr.isPresenting&&data.floor&&walkable(hit.point.x,hit.point.z)&&!blocked(hit.point.x,hit.point.z)){rig.position.set(hit.point.x,0,hit.point.z)}}
   host.addEventListener('pointerdown',e=>{drag=true;travel=0;lastX=e.clientX;lastY=e.clientY;host.setPointerCapture(e.pointerId)});
-  host.addEventListener('pointermove',e=>{if(!drag||renderer.xr.isPresenting)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;travel+=Math.abs(dx)+Math.abs(dy);yaw-=dx*.004;pitch=T.MathUtils.clamp(pitch-dy*.004,-1.25,1.25);camera.rotation.set(pitch,yaw,0);lastX=e.clientX;lastY=e.clientY});
+  host.addEventListener('pointermove',e=>{if(!drag||renderer.xr.isPresenting)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;travel+=Math.abs(dx)+Math.abs(dy);yaw-=dx*.004*lookSensitivity;pitch=T.MathUtils.clamp(pitch-dy*.004*lookSensitivity*(invertLook?-1:1),-1.25,1.25);camera.rotation.set(pitch,yaw,0);lastX=e.clientX;lastY=e.clientY});
   host.addEventListener('pointerup',e=>{drag=false;if(travel>7||renderer.xr.isPresenting)return;const r=host.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);selectRay()});host.addEventListener('pointercancel',()=>drag=false);
   function talk(){const pos=camera.getWorldPosition(new T.Vector3());const nearest=[...npcs].sort((a,b)=>a.root.position.distanceTo(pos)-b.root.position.distanceTo(pos))[0];if(nearest&&nearest.root.position.distanceTo(pos)<5)speak(nearest.info,nearest.root.position);else document.querySelector('#worldStatus').textContent='Walk closer to a host or visitor, then tap Talk.'}
   document.querySelector('#talk').onclick=talk;
@@ -165,8 +291,21 @@ export async function init(host, places, onVisit, hooks = {}) {
   arRoot.addEventListener('beforexrselect',e=>{if(e.target.closest('button'))e.preventDefault()});
   for(let i=0;i<2;i++){const c=renderer.xr.getController(i);rig.add(c);const line=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(),new T.Vector3(0,0,-12)]),new T.LineBasicMaterial({color:0xd5ee83}));c.add(line);c.addEventListener('select',()=>{if(ar){placeDiorama();return}const rotation=new T.Matrix4().extractRotation(c.matrixWorld);ray.ray.origin.setFromMatrixPosition(c.matrixWorld);ray.ray.direction.set(0,0,-1).applyMatrix4(rotation);selectRay()})}
   function placeDiorama(){if(reticle.visible){arPivot.position.setFromMatrixPosition(reticle.matrix)}else{const cam=renderer.xr.getCamera(),f=new T.Vector3();cam.getWorldDirection(f);f.y=0;f.normalize();arPivot.position.copy(cam.getWorldPosition(new T.Vector3())).addScaledVector(f,1.1);arPivot.position.y-=.6}arPlaced=true;arHint('Placed. Tap another spot to move it, or use Rotate and Size.')}
+  // Immersive AR must never share the camera view with page banners or panels.
+  // Inline important styles also protect against stale mobile stylesheet caches.
+  const xrObstructions=['.intro','#worldStatus','#toast','#panel','header','.worldbar','.destinations','footer'];
+  const hiddenForXR=new Map();
+  function setImmersiveLayout(active){
+    document.body.classList.toggle('xr-session-active',active);
+    for(const selector of xrObstructions){
+      const el=document.querySelector(selector);if(!el)continue;
+      if(active){hiddenForXR.set(el,{value:el.style.getPropertyValue('display'),priority:el.style.getPropertyPriority('display')});el.style.setProperty('display','none','important');}
+      else if(hiddenForXR.has(el)){const previous=hiddenForXR.get(el);if(previous.value)el.style.setProperty('display',previous.value,previous.priority);else el.style.removeProperty('display');}
+    }
+    if(!active)hiddenForXR.clear();
+  }
   renderer.xr.addEventListener('sessionstart',()=>{
-    ar=renderer.xr.getSession().environmentBlendMode!=='opaque';aerial=false;rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);
+    setImmersiveLayout(true);ar=renderer.xr.getSession().environmentBlendMode!=='opaque';aerial=false;if(homeMode){homeMode=false;homes.leave();city.visible=true}rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);
     if(!ar)return;
     document.body.classList.add('ar-active');document.documentElement.classList.add('ar-active');scene.background=null;scene.fog=null;sun.castShadow=false;
     arPivot.add(city);city.position.set(0,0,31);arPivot.scale.setScalar(arScale);arPivot.rotation.set(0,0,0);arPivot.visible=true;arPlaced=false;
@@ -175,7 +314,7 @@ export async function init(host, places, onVisit, hooks = {}) {
   });
   renderer.xr.addEventListener('sessionend',()=>{
     if(ar){scene.add(city);city.position.set(0,0,0);arPivot.visible=false;reticle.visible=false;hitSource?.cancel?.();hitSource=null;hitRequested=false;sun.castShadow=true;for(let i=0;i<2;i++)renderer.xr.getController(i).visible=true}
-    document.body.classList.remove('ar-active');document.documentElement.classList.remove('ar-active');ar=false;city.visible=true;rig.rotation.y=0;scene.background=sky;scene.fog=new T.Fog(sky,55,145);street()});
+    setImmersiveLayout(false);document.body.classList.remove('ar-active');document.documentElement.classList.remove('ar-active');ar=false;city.visible=true;rig.rotation.y=0;scene.background=sky;scene.fog=new T.Fog(sky,55,145);street()});
   function arFrame(){
     const frame=renderer.xr.getFrame(),session=renderer.xr.getSession();if(!frame)return;
     if(!hitRequested){hitRequested=true;session.requestReferenceSpace('viewer').then(space=>session.requestHitTestSource?.({space})).then(src=>{hitSource=src||null}).catch(()=>{hitSource=null;arHint('Surface detection unavailable. Tap to place the district in front of you.')})}
@@ -184,22 +323,53 @@ export async function init(host, places, onVisit, hooks = {}) {
     if(!arPlaced){if(reticle.visible)arPivot.position.setFromMatrixPosition(reticle.matrix);else{const cam=renderer.xr.getCamera(),f=new T.Vector3();cam.getWorldDirection(f);f.y=0;if(f.lengthSq()>1e-4){f.normalize();arPivot.position.copy(cam.getWorldPosition(new T.Vector3())).addScaledVector(f,1.1);arPivot.position.y-=.6}}}
   }
   const arControls={exit:()=>renderer.xr.getSession()?.end(),rotate:()=>{arPivot.rotation.y+=Math.PI/8},bigger:()=>{arScale=Math.min(.03,arScale*1.25);arPivot.scale.setScalar(arScale)},smaller:()=>{arScale=Math.max(.003,arScale/1.25);arPivot.scale.setScalar(arScale)}};
+  // Standard-mapping Xbox and PlayStation controllers via the browser Gamepad API.
+  // Controllers require a user button press to become visible in some browsers.
+  let previousButtons=new Set(),controllerSeen=false;
+  const deadzone=v=>Math.abs(v)<.16?0:Math.sign(v)*(Math.abs(v)-.16)/.84;
+  function gamepadInput(dt){
+    if(renderer.xr.isPresenting||!navigator.getGamepads)return;
+    const pad=Array.from(navigator.getGamepads()).find(p=>p&&p.mapping==='standard'&&p.connected);
+    if(!pad){previousButtons.clear();controllerSeen=false;return}
+    if(!controllerSeen){controllerSeen=true;const el=document.querySelector('#controllerStatus');if(el)el.textContent='Controller connected: '+pad.id.split('(')[0].slice(0,38)}
+    const axes=pad.axes||[],lx=deadzone(axes[0]||0),ly=deadzone(axes[1]||0),rx=deadzone(axes[2]||0),ry=deadzone(axes[3]||0);
+    // Standard mapping: left stick walk/strafe, right stick free-look.
+    yaw-=rx*dt*2.4*lookSensitivity;pitch=T.MathUtils.clamp(pitch-ry*dt*1.7*lookSensitivity*(invertLook?-1:1),-1.25,1.25);
+    camera.rotation.set(pitch,yaw,0);
+    const speed=pad.buttons[6]?.pressed?6.5:3.8;
+    move((Math.sin(yaw)*ly+Math.cos(yaw)*lx)*dt*speed,(Math.cos(yaw)*ly-Math.sin(yaw)*lx)*dt*speed);
+    const pressed=new Set();
+    pad.buttons.forEach((b,i)=>{if(b.pressed)pressed.add(i)});
+    const tap=(i,fn)=>{if(pressed.has(i)&&!previousButtons.has(i))fn()};
+    tap(0,()=>{pointer.set(0,0);ray.setFromCamera(pointer,camera);selectRay();talk()}); // A / Cross
+    tap(1,()=>{document.querySelector('#panel').hidden=true}); // B / Circle
+    tap(2,()=>{document.querySelector('#exploreMenu')?.click()}); // X / Square
+    tap(3,()=>{homeMode?street():reset()}); // Y / Triangle
+    tap(9,()=>{document.querySelector('#account')?.click()}); // Menu / Options
+    tap(8,()=>{document.querySelector('#walk')?.click()}); // View / Share
+    previousButtons=pressed;
+  }
   const clock=new T.Clock(),direction=new T.Vector3();let time=0,district='plaza';
-  renderer.setAnimationLoop(()=>{
+  document.querySelector('#cameraMode')?.addEventListener('click',()=>setCameraMode(thirdPerson?'first':'third'));
+  let frames=0;renderer.setAnimationLoop(()=>{
     const dt=Math.min(clock.getDelta(),.05);time+=dt;
-    if(!renderer.xr.isPresenting){let f=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));let s=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));const len=Math.max(1,Math.hypot(f,s));move((Math.sin(yaw)*f+Math.cos(yaw)*s)*dt*3.4/len,(Math.cos(yaw)*f-Math.sin(yaw)*s)*dt*3.4/len)}
+    if(!renderer.xr.isPresenting){gamepadInput(dt);let f=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));let s=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));const len=Math.max(1,Math.hypot(f,s));move((Math.sin(yaw)*f+Math.cos(yaw)*s)*dt*3.4/len,(Math.cos(yaw)*f-Math.sin(yaw)*s)*dt*3.4/len)}
     else if(!ar){for(const input of renderer.xr.getSession().inputSources){if(!input.gamepad)continue;const axes=input.gamepad.axes;const ax=axes.length>=4?axes[2]:axes[0]||0,az=axes.length>=4?axes[3]:axes[1]||0;if(input.handedness==='left'){renderer.xr.getCamera().getWorldDirection(direction);direction.y=0;direction.normalize();const f=Math.abs(az)>.18?-az:0,s=Math.abs(ax)>.18?ax:0;move((direction.x*f-direction.z*s)*dt*2.4,(direction.z*f+direction.x*s)*dt*2.4)}if(input.handedness==='right'){if(Math.abs(ax)<.3)snapReady=true;if(Math.abs(ax)>.7&&snapReady){rig.rotation.y-=Math.sign(ax)*Math.PI/6;snapReady=false}}}}
+    updateCameraMode();
+    const moving=keys.size>0||[...previousButtons].some(i=>i===6);
+    avatarLimbs.forEach((limb,i)=>{limb.rotation.x=T.MathUtils.lerp(limb.rotation.x,moving?Math.sin(time*9+(i%2)*Math.PI)*.35:0,.15)});
     for(const n of npcs){if(n.walking){const t=time*.3+n.phase;n.root.position.z=n.startZ+Math.sin(t)*3;n.root.rotation.y=Math.cos(t)>=0?0:Math.PI;n.limbs.forEach((l,j)=>l.rotation.x=Math.sin(time*5+n.phase)*(j%2?.3:.22)*(j<2?1:-1))}else{n.root.position.y=Math.sin(time*1.4+n.phase)*.012;n.limbs[0].rotation.z=.08+Math.sin(time+n.phase)*.04}}
     if(dialogue.visible){dialogue.lookAt(camera.getWorldPosition(direction));if(performance.now()>dialogueUntil){dialogue.visible=false;if(focused){focused.focused=false;focused=null}}}
     if(ar)arFrame();
     market.update(dt,time);
-    if(!ar&&!aerial){const px=rig.position.x,pz=rig.position.z;const hitPortal=portalAt(px,pz);if(hitPortal&&portalArmed)transit(hitPortal.id);else if(!hitPortal&&PORTALS.every(p=>Math.hypot(px-p.x,pz-p.z)>1.6))portalArmed=true;
+    if(!ar&&!aerial&&!homeMode){const px=rig.position.x,pz=rig.position.z;const hitPortal=portalAt(px,pz);if(hitPortal&&portalArmed)transit(hitPortal.id);else if(!hitPortal&&PORTALS.every(p=>Math.hypot(px-p.x,pz-p.z)>1.6))portalArmed=true;
       const d=districtAt(rig.position.z);if(d!==district){district=d;hooks.onDistrict?.(d)}}
     // Keep the shadow camera centred on the visitor so both districts get shadows.
     const sx=Math.round(rig.position.x/8)*8,sz=Math.round(rig.position.z/8)*8;sun.target.position.set(sx,0,sz);sun.position.set(sx-30,45,sz+25);
     renderer.render(scene,camera);
+    if(++frames===2)document.querySelector('#viewport').dataset.rendered='true';
   });
   new ResizeObserver(()=>{if(!host.clientWidth||!host.clientHeight)return;camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix();renderer.setSize(host.clientWidth,host.clientHeight)}).observe(host);
   renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();document.querySelector('#worldStatus').textContent='3D paused. Reload to restore, or use destination buttons.'});
-  return {reset,visit,enter:i=>visit(i,true),goDistrict,visitShop,enterShop:i=>visitShop(i,true),focusProduct,ar:arControls,stats:{shops:MARKET_LAYOUT.length,products:market.products.length,npcs:npcs.length}};
+  return {reset,visit,enter:i=>visit(i,true),enterHome,setCameraMode,setAvatarColor,setLookSettings:(sensitivity,inverted)=>{lookSensitivity=sensitivity;invertLook=inverted},goDistrict,visitShop,enterShop:i=>visitShop(i,true),focusProduct,ar:arControls,stats:{shops:MARKET_LAYOUT.length,products:market.products.length,npcs:npcs.length}};
 }
