@@ -24,3 +24,12 @@ All seven venues now have open, walkable doorways, window/wall collisions and fu
 Seven stationary hosts and four walking visitors have scripted conversations. Click/tap a character or approach and press **E / Talk to NPC**. Dialogue is displayed in the 3D world for VR users. VR adds left-thumbstick movement, right-thumbstick snap turns, and trigger selection of visible floors for teleporting. Hardware testing is still required.
 
 Brick, stone, wood and plaster textures are locally generated with bump mapping. The scene adds sunlight shadows, glass, landscaping, furniture and articulated NPCs. These are procedural assets, not scanned photorealistic buildings or humans. `npm test` includes doorway routes, wall/window collision and unobstructed plaza paths.
+
+## Districts update: Budz Marketplace, transit portals, AR tabletop
+**Budz Marketplace** is a second district north of the Central Plaza, reached on foot through two gateways behind the Lounge or by stepping into the glowing transit ring. A string-lit boulevard holds five walk-in storefronts (Dispensary Showroom, Accessories, Fashion Boutique, Best Budz Shop, Art Gallery), the Budz Garden pocket park, a host in every shop and three walking regulars.
+
+Every display is an interactive 3D product: tap it to spin it up, see an in-world info card (readable in VR) and open the details panel. The Dispensary Showroom is education only: category guides, label literacy and how to read a lab report (COA). Retailer links appear only after a visitor picks a jurisdiction, and only for entries in `marketplace-data.js` marked `verified: true` with an https URL. Add licensed partners there; the list ships empty. Merch, fashion and art link to `MARKET_CONFIG.shopUrl` once set.
+
+**AR** now places the whole world as a tabletop miniature on a real surface (hit-test, with a fallback in front of the viewer), with Rotate, Size and Exit controls. Only that small HUD is drawn over the camera.
+
+Edit shops and products in `marketplace-data.js`. `npm test` covers storefront doorways, plaza-to-market walking routes, portal arrivals and group-session messages.

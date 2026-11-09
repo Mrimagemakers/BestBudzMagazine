@@ -4,3 +4,50 @@
 
 /* Keep the street-level view clear while exploring. */
 .intro{top:120px;left:24px;max-width:240px;padding:14px 20px;background:#122a22b8;border-radius:14px}.intro h1{font-size:32px;margin:8px 0}.intro p{font-size:11px;margin:8px 0}.intro .eyebrow{font-size:8px}#viewport{height:70dvh;min-height:480px}#worldStatus{background:#132e27dd;padding:10px 14px;border-radius:10px;max-width:330px;line-height:1.5}@media(max-width:800px){.intro{top:95px;left:10px;max-width:175px;padding:10px}.intro h1{font-size:24px}.intro p{display:none}#worldStatus{top:190px;right:10px;max-width:210px;font-size:10px}.worldbar button{font-size:12px;padding:10px 12px}}
+
+/* Districts & Budz Marketplace */
+.districts{padding-bottom:0}.districts .lede{font-size:13px;margin:-6px 0 18px}
+#districtNav{grid-template-columns:repeat(7,1fr)}#districtNav button[data-district]{background:#2a4a36;border-color:#d5ee8366}
+#panel h3.sub{margin:22px 0 8px;font-size:11px;letter-spacing:2px;color:var(--lime);text-transform:uppercase}
+#panel .products{display:flex;flex-wrap:wrap;gap:8px}#panel button.product{background:#24382d;color:#f6f1df;border:1px solid #ffffff30;font-size:13px;padding:9px 14px}
+#panel button.ghost{background:transparent;color:#d5ee83;border:1px solid #d5ee8360;margin-top:14px}
+#panel .facts{padding-left:18px;line-height:1.6;color:#dfe6d6}#panel .facts li{margin:6px 0}
+#panel .cta{display:inline-block;background:var(--lime);color:#17241c!important;border-radius:24px;padding:11px 19px;text-decoration:none;margin-top:8px}
+#panel .soon{font-size:13px;color:#e8c98f}
+#panel .retail{background:#13241d}#panel .retail select{margin-bottom:6px}#retailList a{display:block;margin-top:10px}#retailList small{display:block;color:#9fb096;font-size:11px}
+@media(max-width:800px){#districtNav{grid-template-columns:repeat(2,1fr)}}
+
+/* ---------- Layering: info panel always above three.js XR buttons ---------- */
+#xr button{z-index:auto!important;position:static!important;left:auto!important;bottom:auto!important}
+#panel{z-index:1000}#toast{z-index:1001}
+main{position:relative}.intro{top:20px}#worldStatus{top:20px;z-index:2}
+
+/* ---------- AR: only the HUD is drawn over the camera feed ---------- */
+#arOverlay{display:none}
+body.ar-active,body.ar-active #app,body.ar-active main,body.ar-active #viewport{background:transparent!important}
+#arOverlay{position:fixed;inset:0;flex-direction:column;justify-content:space-between;padding:max(14px,env(safe-area-inset-top)) 14px max(18px,env(safe-area-inset-bottom));pointer-events:none;background:transparent;color:#f6f1df;font:15px 'DM Sans',sans-serif}
+body.ar-active #arOverlay{display:flex}
+#arOverlay .arcard{pointer-events:auto;align-self:stretch;background:#122a22d9;border:1px solid #d5ee8355;border-radius:14px;padding:12px 16px;backdrop-filter:blur(8px)}
+#arOverlay .arcard p{margin:6px 0 0;font-size:14px;line-height:1.45;color:#eef3e4}
+#arOverlay .arbtns{pointer-events:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#arOverlay .arbtns button{padding:13px 8px;font-size:14px;box-shadow:0 4px 14px #0006}
+#arOverlay .arexit{grid-column:1/-1;background:#14261f;color:#f6f1df;border:1px solid #ffffff55}
+
+/* ---------- Phones ---------- */
+@media(max-width:800px){
+  header{height:auto;min-height:0;padding:12px 14px;gap:8px;flex-wrap:nowrap}
+  .brand{font-size:30px;gap:8px}.brand span{font-size:8px;letter-spacing:1.5px;line-height:1.35;white-space:nowrap}
+  header button{padding:8px 14px;font-size:13px;white-space:nowrap}
+  .intro{display:none}
+  #worldStatus{top:10px;left:10px;right:10px;max-width:none;font-size:11px;padding:8px 12px}
+  #viewport{height:62dvh;min-height:380px}
+  .worldbar{padding:12px 14px;gap:8px}.worldbar>span{display:none}
+  #xr{order:-1;width:100%}#xr button{flex:1;font-size:12px!important;padding:10px 6px!important}
+  .worldbar>button{flex:1 1 30%;font-size:13px;padding:10px 8px}
+  #walkControls{width:100%;justify-content:center;gap:10px}#walkControls button{min-width:56px;min-height:52px}
+  #panel{left:8px;right:8px;top:auto;bottom:8px;width:auto;max-height:72dvh;padding:20px 18px;border-radius:18px}
+  #panel h2{font-size:26px;margin:10px 0}#panel p{font-size:14px}
+  .destinations{padding:26px 14px}h2{font-size:24px}
+}
+html.ar-active,html.ar-active body{background:transparent!important}
+body.ar-active #app,body.ar-active #gate,body.ar-active #toast{visibility:hidden}
