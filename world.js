@@ -4,6 +4,7 @@ import {WORLD_COORDS,buildingWalls,blockedAt} from './logic.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {buildUltra} from './ultra.js';
 import {mountXR} from './xr-controls.js';
+import {loadStageOneModels} from './model-assets.js';
 
 // All materials are generated locally: no external texture downloads.
 export async function init(host, places, onVisit) {
@@ -39,6 +40,7 @@ export async function init(host, places, onVisit) {
   Object.assign(sun.shadow.camera, {left:-48,right:48,top:48,bottom:-48,near:1,far:130});
   sun.shadow.bias = -.0004; sun.shadow.normalBias = .04; scene.add(sun);
   const city = new T.Group(); scene.add(city);
+  loadStageOneModels(city,mobileDevice);
   const homes=buildHomes(scene);let homeMode=false;
   const walls = [], npcs = [], seats = [];
   const coords = WORLD_COORDS;
