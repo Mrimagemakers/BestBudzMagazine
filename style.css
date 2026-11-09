@@ -131,3 +131,6 @@ body.xr-session-active .worldbar,body.xr-session-active header,body.xr-session-a
 /* Avatar and camera settings */
 #cameraMode{background:#b9ff72!important;color:#102017!important;font-weight:700!important}.controls-settings{display:grid;gap:14px}.controls-settings input[type=range]{width:min(440px,100%);accent-color:#b9ff72}.controls-settings input[type=color]{width:80px;height:48px;background:transparent;border:1px solid #ffffff44;border-radius:10px;padding:4px}.controls-settings label{font-weight:600}.controls-settings #resetControls{max-width:200px;border:1px solid #b9ff7270;border-radius:12px;padding:12px}
 @media(max-width:700px){#cameraMode{max-width:93px;line-height:1.1;white-space:normal;font-size:10px!important}}
+
+#xrExitOverlay{position:fixed;inset:0;pointer-events:none}
+#xrExitOverlay button{position:absolute;bottom:max(20px,env(safe-area-inset-bottom));right:20px;pointer-events:auto}

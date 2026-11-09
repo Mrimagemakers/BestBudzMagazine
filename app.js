@@ -3,10 +3,10 @@ import {isAdult,validRoom} from './logic.js';
 import {HOMES} from './homes.js';
 const $=s=>document.querySelector(s);
 const places=[
-['Market','Independent makers','Browse the culture shop. Brand partnerships and maker catalogs are editorial placeholders; no purchases are available.',0xbdb18b],
-['Lounge','Make yourself at home','A place to meet. Open Group session to share a room with friends when the community server is configured.',0x9fac77],
+['High Fidelity Marketplace','Independent makers','Browse the culture shop. Brand partnerships and maker catalogs are editorial placeholders; no purchases are available.',0xbdb18b],
+['The Green Room','Make yourself at home','A place to meet. Open Group session to share a room with friends when the community server is configured.',0x9fac77],
 ['Coffee shop','Slow down, stay curious','The reading table: thoughtful conversations, fresh perspectives and a virtual coffee. Select the editorial room for source material.',0xc88d60],
-['Music venue','Sound & community','An open stage for future licensed artist performances. Preview a quiet synthesized ambient tone below.',0x9c8db6],
+['Beat Garden','Sound & community','An open stage for future licensed artist performances. Preview a quiet synthesized ambient tone below.',0x9c8db6],
 ['Cinema','Stories worth seeing','The screening room is ready for licensed films and creator conversations. No third-party films are embedded without permission.',0x6b9eaa],
 ['Editorial / politics','Independent perspectives','Explore the evidence, ask better questions, and distinguish opinion from reporting. Laws vary by jurisdiction; consult official local sources.',0xa6b4c1],
 ['Strain library','Curiosity, with context','Explore illustrative cultivar labels. A name or photograph cannot establish cannabinoid content, safety, or clinical benefit.',0xadd78a]];
@@ -41,7 +41,7 @@ $('#closePanel').onclick=()=>$('#panel').hidden=true;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#panel').hidden=true});
 $('#exit').onclick=()=>{sessionStorage.removeItem('bb-age');location.reload()};
 $('#ageForm').onsubmit=e=>{e.preventDefault();if(!isAdult($('#dob').value)||!$('#attest').checked){$('#ageError').textContent='Entry requires confirmation that you are at least 21.';return}sessionStorage.setItem('bb-age','yes');enter().then(openSharedPlace)};
-async function enter(){$('#gate').hidden=true;$('#app').hidden=false;if(!world){try{const m=await import('./world.js?v=landscape-8');world=await m.init($('#viewport'),places,visit);$('#worldStatus').textContent='7 OPEN INTERIORS · 11 NPCs · WALK IN & EXPLORE'}catch(e){$('#worldStatus').textContent='3D unavailable. Explore all destinations using the buttons below.';console.error(e)}}}
+async function enter(){$('#gate').hidden=true;$('#app').hidden=false;if(!world){try{const m=await import('./world.js?v=ultra-1');world=await m.init($('#viewport'),places,visit);$('#worldStatus').textContent='ULTRA · 7 OPEN INTERIORS · 11 NPCs'}catch(e){$('#worldStatus').textContent='3D unavailable. Explore all destinations using the buttons below.';console.error(e)}}}
 $('#home').onclick=()=>world?.reset();
 $('#share').onclick=async()=>{const url=new URL(location.href);url.search='';url.hash='place='+current;try{if(navigator.share)await navigator.share({title:'Best Budz World · '+places[current][0],url:url.href});else{await navigator.clipboard.writeText(url.href);toast('Destination link copied')}}catch{toast('Sharing unavailable. Copy this page address to share.')}};
 const config=await fetch('./config.json').then(r=>r.json()).catch(()=>({}));
