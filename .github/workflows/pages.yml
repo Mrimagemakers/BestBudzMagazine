@@ -1,7 +1,7 @@
 name: Deploy Best Budz World
 on:
   push:
-    branches: [main]
+    branches: [main, feat/best-budz-world]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -20,7 +20,7 @@ jobs:
       - run: npm test
       - run: node --check app.js && node --check player-auth.js && node --check world.js && node --check homes.js && node --check ultra.js && node --check xr-controls.js && node --check server/server.js
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/feat/best-budz-world'
     needs: validate
     runs-on: ubuntu-latest
     permissions:

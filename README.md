@@ -5,7 +5,7 @@ An adult-oriented immersive editorial world built with Three.js/WebXR. No sales 
 Serve this directory over localhost (for example `npx serve .`). HTTPS or localhost is required for WebXR. The pinned Three.js modules load from jsDelivr; network access is required.
 
 ## Deploy
-In Settings → Pages choose **GitHub Actions**. Merge the world branch into main; the Pages workflow uploads the static site. No build step. The expected URL is https://mrimagemakers.github.io/BestBudzMagazine/ (not live until deployment succeeds).
+In Settings → Pages choose **GitHub Actions**. Push to main to validate. Fast-forward feat/best-budz-world to the tested commit to deploy through the github-pages environment. No build step. The expected URL is https://mrimagemakers.github.io/BestBudzMagazine/ (not live until deployment succeeds).
 
 ## Optional services
 See server/README.md for verified email and remote group presence. Static hosting alone cannot send verification email or enforce identity/age checks. The 21+ gate is a self-attestation stored per browser session, not identity verification. Content files remain publicly accessible on Pages. For legally enforced access, serve all content behind a server-side age/identity provider.
