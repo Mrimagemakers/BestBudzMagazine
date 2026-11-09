@@ -96,6 +96,59 @@ export async function init(host, places, onVisit) {
   function sphere(r,m,x,y,z,parent=city){return mesh(new T.SphereGeometry(r,12,8),m,x,y,z,parent)}
   function sign(text,x,y,z,width=5,parent=city){const c=document.createElement('canvas');c.width=1024;c.height=160;const g=c.getContext('2d');g.fillStyle='#173c30';g.fillRect(0,0,1024,160);g.strokeStyle='#b5c78e';g.strokeRect(8,8,1008,144);g.fillStyle='#f8ebcc';g.textAlign='center';g.font='500 48px sans-serif';g.fillText(text,512,98,960);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;const o=mesh(new T.PlaneGeometry(width,width*160/1024),new T.MeshBasicMaterial({map:tex,side:T.DoubleSide}),x,y,z,parent);o.castShadow=false;return o}
   box(96,.2,100,surface('noise','#6b7952'),0,-.16,0);
+  // Outdoor landscaping: instanced grass blades with color variation.
+  // Single draw call keeps dense planting affordable on phones and Quest.
+  const grassCount=mobileDevice?2800:9000;
+  const bladeGeo=new T.ConeGeometry(.045,.36,3);
+  bladeGeo.translate(0,.18,0);
+  const bladeMat=new T.MeshStandardMaterial({color:0x91a85c,roughness:1,side:T.DoubleSide});
+  const blades=new T.InstancedMesh(bladeGeo,bladeMat,grassCount);
+  blades.castShadow=false;blades.receiveShadow=false;
+  const dummy=new T.Object3D(),grassColor=new T.Color();
+  let planted=0,attempts=0;
+  while(planted<grassCount&&attempts<grassCount*12){
+    attempts++;
+    const x=(rand()-.5)*91,z=(rand()-.5)*95;
+    if(Math.abs(x)<28&&z>-30&&z<35)continue; // keep roads and venues clear
+    dummy.position.set(x,-.03,z);dummy.rotation.set(0,rand()*6.28,(rand()-.5)*.3);
+    dummy.scale.set(.7+rand()*.9,.65+rand()*1.6,.7+rand()*.9);
+    dummy.updateMatrix();blades.setMatrixAt(planted,dummy.matrix);
+    grassColor.setHSL(.23+rand()*.08,.27+rand()*.26,.24+rand()*.23);
+    blades.setColorAt(planted,grassColor);planted++;
+  }
+  blades.count=planted;blades.instanceMatrix.needsUpdate=true;city.add(blades);
+  // Layered trees with tapered trunks, branches, and non-uniform leaf clusters.
+  const bark=surface('wood','#64513a');
+  const leafMats=[0x385e35,0x47783f,0x5a8747,0x718c49].map(c=>new T.MeshStandardMaterial({color:c,roughness:1,flatShading:true}));
+  const trunkGeo=new T.CylinderGeometry(.16,.29,3.8,7);
+  const branchGeo=new T.CylinderGeometry(.055,.12,1.7,6);
+  const canopyGeo=new T.IcosahedronGeometry(1,1);
+  function tree(x,z,height=1){
+    const group=new T.Group();group.position.set(x,0,z);group.scale.setScalar(height);city.add(group);
+    const trunk=mesh(trunkGeo,bark,0,1.9,0,group);
+    for(let j=0;j<5;j++){
+      const angle=j*Math.PI*2/5+rand()*.25,level=2.4+(j%3)*.48;
+      const branch=mesh(branchGeo,bark,Math.cos(angle)*.45,level,Math.sin(angle)*.45,group);
+      branch.rotation.z=-Math.cos(angle)*.7;branch.rotation.x=Math.sin(angle)*.7;
+    }
+    for(let j=0;j<10;j++){
+      const angle=j*2.39996,ring=j%3,dist=.65+ring*.22;
+      const leaf=mesh(canopyGeo,leafMats[j%leafMats.length],Math.cos(angle)*dist,3.8+(j%4)*.43,Math.sin(angle)*dist,group);
+      leaf.scale.set(.85+rand()*.38,.95+rand()*.5,.85+rand()*.38);
+      leaf.castShadow=!mobileDevice;
+    }
+  }
+  for(let i=0;i<26;i++){
+    const x=i%2===0?-35-rand()*9:35+rand()*9,z=-42+Math.floor(i/2)*7+rand()*2;
+    tree(x,z,.75+rand()*.6);
+  }
+  for(let i=0;i<14;i++){const x=(rand()-.5)*90,z=i%2===0?-39-rand()*7:40+rand()*7;tree(x,z,.7+rand()*.5)}
+  // Architectural trim and street detail to break up flat facade geometry.
+  const concrete=surface('tile','#8e9290');
+  for(let z=-29;z<35;z+=7){
+    box(1.6,.055,1.5,concrete,-26.3,.01,z);
+    box(1.6,.055,1.5,concrete,26.3,.01,z);
+  }
   const ground=box(53,.08,60,stone,0,-.04,3);ground.userData.floor=true;
   // Narrow stone joints and raised planting beds break up the paved plaza.
   for(let z=-26;z<34;z+=4)box(53,.005,.025,0x868f82,0,.005,z);
@@ -121,6 +174,11 @@ export async function init(host, places, onVisit) {
     box(10,1,.3,plaster,x,3.9,z+4.5);
     box(10.7,.24,9.7,plaster,x,4.5,z);
     box(10.7,.12,1.3,accent,x,3.5,z+5);
+    // Raised cornice, corner pilasters, and contrasting facade base.
+    box(11,.16,10.1,concrete,x,4.64,z);
+    for(const dx of [-4.85,4.85])box(.25,4.3,.35,concrete,x+dx,2.15,z+4.65);
+    for(const dx of [-3.2,3.2])box(3.5,.18,.36,concrete,x+dx,.18,z+4.66);
+    box(10.5,.12,.5,metal,x,3.57,z+4.85);
     const title=sign(p[0].toUpperCase(),x,3.92,z+4.7,7);title.userData.place=i;
     sign('OPEN · WALK INSIDE',x,2.85,z+4.65,2.5);
     box(2.6,.015,1,0x405b48,x,.055,z+4.7);
@@ -138,11 +196,6 @@ export async function init(host, places, onVisit) {
     if(i===6){for(let k=0;k<3;k++){const dx=(k-1)*2.8;box(1,.9,.8,stone,x+dx,.5,z-2);plant(x+dx,z-2,.7);sign(['BLUE DREAM','SOUR DIESEL','GDP'][k],x+dx,.75,z-1.55,1);const plaque=box(1,.2,.02,accent,x+dx,1.45,z-1.6);plaque.userData.place=6}sign('EDUCATIONAL EXHIBITS · BATCH UNVERIFIED',x,2.1,z-4.3,7)}
     createNPC(x+3.4,z+1.8,i,false);
   });
-  for(let i=0;i<18;i++){
-    const x=i%2?32:-32,z=-28+Math.floor(i/2)*7;
-    cyl(.23,3.4,wood,x,1.7,z);
-    for(let j=0;j<4;j++){const crown=sphere(1.5,0x4f7048,x+(rand()-.5)*1.3,3.7+rand(),z+(rand()-.5)*1.3);crown.scale.y=1.3}
-  }
   for(const z of [-24,-5,14,31])for(const x of [-8,8]){cyl(.06,3.7,metal,x,1.85,z);sphere(.18,new T.MeshStandardMaterial({color:0xffe9b5,emissive:0xffcb76,emissiveIntensity:.6}),x,3.7,z);box(1.7,.16,.5,wood,x,.55,z+1);box(.1,.55,.4,metal,x-.6,.25,z+1);box(.1,.55,.4,metal,x+.6,.25,z+1)}
   // Articulated residents: seven hosts and four walking visitors.
   function createNPC(x,z,index,walking){
