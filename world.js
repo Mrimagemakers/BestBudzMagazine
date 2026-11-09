@@ -1,11 +1,12 @@
 import * as T from 'three';
 import {buildHomes,HOMES} from './homes.js?v=textures-7';
-import {WORLD_COORDS,buildingWalls,blockedAt} from './logic.js';
+import {WORLD_COORDS,buildingWalls,blockedAt,walkable,districtAt,portalAt,PORTALS,MARKET_LAYOUT,toWorld} from './logic.js';
+import {buildMarketplace} from './marketplace.js';
 import {VRButton} from 'three/addons/webxr/VRButton.js';
 import {ARButton} from 'three/addons/webxr/ARButton.js';
 
 // All materials are generated locally: no external texture downloads.
-export async function init(host, places, onVisit) {
+export async function init(host, places, onVisit, hooks = {}) {
   const scene = new T.Scene();
   const sky = new T.Color('#b7ced2');
   scene.background = sky; scene.fog = new T.Fog(sky, 55, 145);
@@ -25,7 +26,7 @@ export async function init(host, places, onVisit) {
   sun.position.set(-30, 45, 25); sun.castShadow = true;
   sun.shadow.mapSize.set(mobileDevice?512:1024,mobileDevice?512:1024);
   Object.assign(sun.shadow.camera, {left:-48,right:48,top:48,bottom:-48,near:1,far:130});
-  sun.shadow.bias = -.0004; sun.shadow.normalBias = .04; scene.add(sun);
+  sun.shadow.bias = -.0004; sun.shadow.normalBias = .04; scene.add(sun); scene.add(sun.target);
   const city = new T.Group(); scene.add(city);
   const homes=buildHomes(scene);let homeMode=false;
   const walls = [], npcs = [], seats = [];
@@ -196,10 +197,10 @@ export async function init(host, places, onVisit) {
     if(i===6){for(let k=0;k<3;k++){const dx=(k-1)*2.8;box(1,.9,.8,stone,x+dx,.5,z-2);plant(x+dx,z-2,.7);sign(['BLUE DREAM','SOUR DIESEL','GDP'][k],x+dx,.75,z-1.55,1);const plaque=box(1,.2,.02,accent,x+dx,1.45,z-1.6);plaque.userData.place=6}sign('EDUCATIONAL EXHIBITS · BATCH UNVERIFIED',x,2.1,z-4.3,7)}
     createNPC(x+3.4,z+1.8,i,false);
   });
-  for(const z of [-24,-5,14,31])for(const x of [-8,8]){cyl(.06,3.7,metal,x,1.85,z);sphere(.18,new T.MeshStandardMaterial({color:0xffe9b5,emissive:0xffcb76,emissiveIntensity:.6}),x,3.7,z);box(1.7,.16,.5,wood,x,.55,z+1);box(.1,.55,.4,metal,x-.6,.25,z+1);box(.1,.55,.4,metal,x+.6,.25,z+1)}
+  for(const z of [-5,14,31])for(const x of [-8,8]){cyl(.06,3.7,metal,x,1.85,z);sphere(.18,new T.MeshStandardMaterial({color:0xffe9b5,emissive:0xffcb76,emissiveIntensity:.6}),x,3.7,z);box(1.7,.16,.5,wood,x,.55,z+1);box(.1,.55,.4,metal,x-.6,.25,z+1);box(.1,.55,.4,metal,x+.6,.25,z+1)}
   // Articulated residents: seven hosts and four walking visitors.
-  function createNPC(x,z,index,walking){
-    const root=new T.Group();root.position.set(x,0,z);city.add(root);
+  function createNPC(x,z,index,walking,custom=null,rot=0){
+    const root=new T.Group();root.position.set(x,0,z);root.rotation.y=rot;city.add(root);
     const skin=[0x8e593b,0xbd8660,0x663e2c,0xd7a478][index%4],cloth=[0x526c5b,0xab744d,0x395b70,0x927083][index%4];
     box(.43,.58,.25,cloth,0,1.17,0,root);sphere(.19,skin,0,1.68,0,root);const hair=sphere(.2,0x29231f,0,1.78,-.025,root);hair.scale.set(1,.65,1);
     for(const dx of [-.065,.065])sphere(.018,0x191b18,dx,1.7,.17,root);
@@ -207,19 +208,25 @@ export async function init(host, places, onVisit) {
       const arm=new T.Group();arm.position.set(side*.29,1.4,0);root.add(arm);cyl(.065,.48,cloth,0,-.23,0,arm);sphere(.07,skin,0,-.5,0,arm);limbs.push(arm);
       const leg=new T.Group();leg.position.set(side*.115,.91,0);root.add(leg);cyl(.085,.69,0x303d3c,0,-.34,0,leg);box(.17,.13,.3,0x252b28,0,-.77,.06,leg);limbs.push(leg);
     }
-    const info=walking?['Visitor '+(index-6),'Neighborhood visitor','Welcome to Best Budz World. All seven venues have open entrances. Look for the OPEN signs.']:npcInfo[index];
+    const info=custom||(walking?['Visitor '+(index-6),'Neighborhood visitor','Welcome to Best Budz World. All seven venues have open entrances, and the Budz Marketplace is through the gateways behind the Lounge.']:npcInfo[index]);
     root.traverse(o=>{if(o.isMesh)o.userData.npc=info});
     npcs.push({root,limbs,info,walking,startX:x,startZ:z,phase:index*1.7});
-    if(!walking)sign(info[0]+' · '+info[1],x,2.2,z,2.6);
+    if(!walking){const tag=sign(info[0]+' · '+info[1],x,2.2,z,2.6);tag.rotation.y=rot}
   }
   for(let i=0;i<4;i++)createNPC(i%2?5:-5,-8+i*8,i+7,true);
+  const market=buildMarketplace({T,city,box,cyl,sphere,mesh,mat,walls,wood,stone,plaster,brick,metal,glass,surface,plant,createNPC});
+  [['Kai','Market regular','The Dispensary Showroom is education only. Take the lessons there before you visit a licensed store.'],['Bree','Market regular','Best Budz Shop has back issues. The gallery is taking artist submissions this season.'],['Omar','Market regular','The transit ring at the far end takes you straight back to the Central Plaza.']].forEach((info,i)=>createNPC(i===1?4.5:-4.5,-56-i*13,30+i,true,info));
   // In-world dialogue remains readable in a headset without relying on HTML overlays.
   const dialogueCanvas=document.createElement('canvas');dialogueCanvas.width=1024;dialogueCanvas.height=512;
   const dialogueTexture=new T.CanvasTexture(dialogueCanvas);dialogueTexture.colorSpace=T.SRGBColorSpace;
   const dialogue=new T.Mesh(new T.PlaneGeometry(2.3,1.15),new T.MeshBasicMaterial({map:dialogueTexture,side:T.DoubleSide}));city.add(dialogue);dialogue.visible=false;let dialogueUntil=0;
-  function speak(info,position){const g=dialogueCanvas.getContext('2d');g.fillStyle='#132e27';g.fillRect(0,0,1024,512);g.strokeStyle='#d4d9a0';g.lineWidth=8;g.strokeRect(8,8,1008,496);g.fillStyle='#e5dea8';g.font='bold 45px sans-serif';g.fillText(info[0]+' / '+info[1],40,75,950);g.fillStyle='#fff7e5';g.font='37px sans-serif';let line='',y=150;for(const word of info[2].split(' ')){if(g.measureText(line+word).width>925){g.fillText(line,40,y);line='';y+=52}line+=word+' '}g.fillText(line,40,y);g.font='26px sans-serif';g.fillStyle='#b8c6b3';g.fillText('NPC · scripted conversation',40,465);dialogueTexture.needsUpdate=true;dialogue.position.copy(position).add(new T.Vector3(0,2.7,0));dialogue.visible=true;dialogueUntil=performance.now()+14000;document.querySelector('#worldStatus').textContent=info[0]+': '+info[2]}
-  const exhibit=new T.Group();scene.add(exhibit);exhibit.visible=false;
-  for(let i=0;i<3;i++){box(.25,.2,.15,places[6][3],(i-1)*.35,0,0,exhibit);sign(['Blue Dream','Sour Diesel','GDP'][i],(i-1)*.35,.22,0,.3,exhibit)}
+  function speak(info,position,footer='NPC · scripted conversation',lift=2.7){const g=dialogueCanvas.getContext('2d');g.fillStyle='#132e27';g.fillRect(0,0,1024,512);g.strokeStyle='#d4d9a0';g.lineWidth=8;g.strokeRect(8,8,1008,496);g.fillStyle='#e5dea8';g.font='bold 45px sans-serif';g.fillText(info[0]+' / '+info[1],40,75,950);g.fillStyle='#fff7e5';g.font='37px sans-serif';let line='',y=150;for(const word of info[2].split(' ')){if(g.measureText(line+word).width>925){g.fillText(line,40,y);line='';y+=52}line+=word+' '}g.fillText(line,40,y);g.font='26px sans-serif';g.fillStyle='#b8c6b3';g.fillText(footer,40,465);dialogueTexture.needsUpdate=true;dialogue.position.copy(position).add(new T.Vector3(0,lift,0));dialogue.visible=true;dialogueUntil=performance.now()+14000;document.querySelector('#worldStatus').textContent=info[0]+': '+info[2]}
+  // AR tabletop: the whole district becomes a miniature placed on a real surface.
+  // The district's long axis spans z -96..33, so the pivot recentres it.
+  const arPivot=new T.Group();scene.add(arPivot);arPivot.visible=false;
+  const reticle=new T.Mesh(new T.RingGeometry(.09,.12,32).rotateX(-Math.PI/2),new T.MeshBasicMaterial({color:0xd5ee83}));reticle.matrixAutoUpdate=false;reticle.visible=false;scene.add(reticle);
+  let arScale=.008,arPlaced=false,hitSource=null,hitRequested=false;
+  const arHint=t=>{const h=document.querySelector('#arHint');if(h)h.textContent=t};
   let lookSensitivity=Number(localStorage.getItem('bb-look-sensitivity')||1),invertLook=localStorage.getItem('bb-invert-look')==='true';
   let yaw=0,pitch=0,drag=false,lastX=0,lastY=0,travel=0,ar=false,aerial=false,snapReady=true;
   // Lightweight local player avatar; no external model or texture downloads.
@@ -240,8 +247,9 @@ export async function init(host, places, onVisit) {
   function updateCameraMode(){
     const third=thirdPerson&&!renderer.xr.isPresenting&&!aerial;
     avatar.visible=third;
-    const targetZ=third?3.7:0,targetY=third?1.1:0;
-    camera.position.set(0,targetY,targetZ);
+    const dist=third?3.7:0,targetY=third?1.1:0;
+    // Orbit behind the avatar along the current look direction.
+    camera.position.set(Math.sin(yaw)*dist,targetY,Math.cos(yaw)*dist);avatar.rotation.y=yaw;
     const btn=document.querySelector('#cameraMode');if(btn)btn.textContent=thirdPerson?'Third-person: ON':'First-person: ON';
   }
   function setCameraMode(mode){thirdPerson=mode==='third';localStorage.setItem('bb-camera-mode',thirdPerson?'third':'first');updateCameraMode()}
@@ -252,12 +260,22 @@ export async function init(host, places, onVisit) {
   function reset(){if(renderer.xr.isPresenting)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=true;rig.position.set(39,36,54);camera.position.set(0,0,0);yaw=.6;pitch=-.5;camera.rotation.set(pitch,yaw,0);updateCameraMode()}
   street();
   function blocked(x,z){return homeMode?Math.abs(x)>5.8||Math.abs(z)>5.8:blockedAt(x,z,walls)}
-  function move(dx,dz){const n=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.12));for(let j=0;j<n;j++){let x=T.MathUtils.clamp(rig.position.x+dx/n,-27,27);if(aerial||!blocked(x,rig.position.z))rig.position.x=x;let z=T.MathUtils.clamp(rig.position.z+dz/n,-26,33);if(aerial||!blocked(rig.position.x,z))rig.position.z=z}}
-  function visit(i,inside=false){if(ar)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}const [x,z]=coords[i];aerial=false;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z+(inside?2.9:7));if(!renderer.xr.isPresenting){yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode()}}
+  const ok=(x,z)=>aerial?(x>-30&&x<30&&z>-98&&z<36):homeMode?!blocked(x,z):(walkable(x,z)&&!blocked(x,z));
+  function move(dx,dz){const n=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.12));for(let j=0;j<n;j++){const x=rig.position.x+dx/n;if(ok(x,rig.position.z))rig.position.x=x;const z=rig.position.z+dz/n;if(ok(rig.position.x,z))rig.position.z=z}}
+  function visit(i,inside=false){if(ar)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}const [x,z]=coords[i];aerial=false;rig.rotation.y=0;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z+(inside?2.9:7));if(!renderer.xr.isPresenting){yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode()}}
   function enterHome(id){if(ar)return;homeMode=true;city.visible=false;const selected=homes.enter(id);aerial=false;rig.position.set(0,1.7,4.8);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode();return selected}
+  function placeAt(x,z,y=0){if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=false;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z);rig.rotation.y=0;if(!renderer.xr.isPresenting){yaw=y;pitch=0;camera.rotation.set(0,y,0);updateCameraMode()}else rig.rotation.y=y}
+  // Transit: from a portal id, jump to the connected portal's arrival point.
+  let portalArmed=true;
+  function transit(fromId){const from=PORTALS.find(p=>p.id===fromId),to=PORTALS.find(p=>p.id===from.to);portalArmed=false;placeAt(to.arrive.x,to.arrive.z,to.arrive.yaw);document.querySelector('#worldStatus').textContent='Arrived: '+to.label}
+  function goDistrict(id){const p=PORTALS.find(q=>q.id===id);if(p)placeAt(p.arrive.x,p.arrive.z,p.arrive.yaw)}
+  // Shops face the boulevard; "outside" stands on the boulevard, "inside" just past the door.
+  function visitShop(i,inside=false){if(ar)return;const [x,z,rot]=MARKET_LAYOUT[i];const [px,pz]=toWorld(0,inside?2.9:7,x,z,rot);placeAt(px,pz,rot)}
+  let focused=null;
+  function focusProduct(si,pi){if(focused)focused.focused=false;focused=market.products.find(p=>p.shop===si&&p.index===pi)||null;if(!focused)return;focused.focused=true;const d=focused.data;const pos=focused.group.getWorldPosition(new T.Vector3());speak([d.name,d.category,d.blurb+' '+(d.details[0]||'')],pos,'BUDZ MARKETPLACE · interactive display',focused.spin?.9:1.5)}
   const ray=new T.Raycaster(),pointer=new T.Vector2();
   // Select a person/sign, or teleport to visible floor surfaces in VR.
-  function selectRay(){const hit=ray.intersectObjects(city.children,true).find(h=>h.object!==dialogue);if(!hit||hit.distance>28)return;const data=hit.object.userData;if(data.npc){speak(data.npc,new T.Vector3(hit.point.x,0,hit.point.z));return}if(data.place!==undefined){onVisit(data.place);return}if(renderer.xr.isPresenting&&data.floor&&!blocked(hit.point.x,hit.point.z)){rig.position.set(hit.point.x,0,hit.point.z)}}
+  function selectRay(){const hit=ray.intersectObjects(city.children,true).find(h=>h.object!==dialogue);if(!hit||hit.distance>28)return;const data=hit.object.userData;if(data.product){focusProduct(...data.product);hooks.onProduct?.(...data.product);return}if(data.shop!==undefined){hooks.onShop?.(data.shop);return}if(data.portal){transit(data.portal);return}if(data.npc){speak(data.npc,new T.Vector3(hit.point.x,0,hit.point.z));return}if(data.place!==undefined){onVisit(data.place);return}if(renderer.xr.isPresenting&&data.floor&&walkable(hit.point.x,hit.point.z)&&!blocked(hit.point.x,hit.point.z)){rig.position.set(hit.point.x,0,hit.point.z)}}
   host.addEventListener('pointerdown',e=>{drag=true;travel=0;lastX=e.clientX;lastY=e.clientY;host.setPointerCapture(e.pointerId)});
   host.addEventListener('pointermove',e=>{if(!drag||renderer.xr.isPresenting)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;travel+=Math.abs(dx)+Math.abs(dy);yaw-=dx*.004*lookSensitivity;pitch=T.MathUtils.clamp(pitch-dy*.004*lookSensitivity*(invertLook?-1:1),-1.25,1.25);camera.rotation.set(pitch,yaw,0);lastX=e.clientX;lastY=e.clientY});
   host.addEventListener('pointerup',e=>{drag=false;if(travel>7||renderer.xr.isPresenting)return;const r=host.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);selectRay()});host.addEventListener('pointercancel',()=>drag=false);
@@ -268,8 +286,11 @@ export async function init(host, places, onVisit) {
   document.querySelector('#walk').onclick=street;
   for(const button of document.querySelectorAll('[data-walk]')){button.addEventListener('pointerdown',e=>{e.preventDefault();button.setPointerCapture(e.pointerId);held.set(e.pointerId,button.dataset.walk);keys.add(button.dataset.walk)});for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,e=>{const k=held.get(e.pointerId);held.delete(e.pointerId);if(![...held.values()].includes(k))keys.delete(k)})}
   document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();held.clear();drag=false}});
-  const xrRoot=document.querySelector('#xr');xrRoot.append(VRButton.createButton(renderer));xrRoot.append(ARButton.createButton(renderer));
-  for(let i=0;i<2;i++){const c=renderer.xr.getController(i);rig.add(c);const line=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(),new T.Vector3(0,0,-12)]),new T.LineBasicMaterial({color:0xd5ee83}));c.add(line);c.addEventListener('select',()=>{if(ar){return}const rotation=new T.Matrix4().extractRotation(c.matrixWorld);ray.ray.origin.setFromMatrixPosition(c.matrixWorld);ray.ray.direction.set(0,0,-1).applyMatrix4(rotation);selectRay()})}
+  const xrRoot=document.querySelector('#xr');xrRoot.append(VRButton.createButton(renderer));const arRoot=document.querySelector('#arOverlay');xrRoot.append(ARButton.createButton(renderer,{optionalFeatures:['hit-test','dom-overlay','local-floor'],domOverlay:{root:arRoot}}));
+  // Taps on HUD buttons must not also place the diorama.
+  arRoot.addEventListener('beforexrselect',e=>{if(e.target.closest('button'))e.preventDefault()});
+  for(let i=0;i<2;i++){const c=renderer.xr.getController(i);rig.add(c);const line=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(),new T.Vector3(0,0,-12)]),new T.LineBasicMaterial({color:0xd5ee83}));c.add(line);c.addEventListener('select',()=>{if(ar){placeDiorama();return}const rotation=new T.Matrix4().extractRotation(c.matrixWorld);ray.ray.origin.setFromMatrixPosition(c.matrixWorld);ray.ray.direction.set(0,0,-1).applyMatrix4(rotation);selectRay()})}
+  function placeDiorama(){if(reticle.visible){arPivot.position.setFromMatrixPosition(reticle.matrix)}else{const cam=renderer.xr.getCamera(),f=new T.Vector3();cam.getWorldDirection(f);f.y=0;f.normalize();arPivot.position.copy(cam.getWorldPosition(new T.Vector3())).addScaledVector(f,1.1);arPivot.position.y-=.6}arPlaced=true;arHint('Placed. Tap another spot to move it, or use Rotate and Size.')}
   // Immersive AR must never share the camera view with page banners or panels.
   // Inline important styles also protect against stale mobile stylesheet caches.
   const xrObstructions=['.intro','#worldStatus','#toast','#panel','header','.worldbar','.destinations','footer'];
@@ -283,8 +304,25 @@ export async function init(host, places, onVisit) {
     }
     if(!active)hiddenForXR.clear();
   }
-  renderer.xr.addEventListener('sessionstart',()=>{setImmersiveLayout(true);ar=renderer.xr.getSession().environmentBlendMode!=='opaque';city.visible=!ar;exhibit.visible=ar;aerial=false;if(homeMode){homeMode=false;homes.leave()}rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);if(ar){scene.background=null;scene.fog=null;exhibit.position.set(0,1.2,-1)}});
-  renderer.xr.addEventListener('sessionend',()=>{setImmersiveLayout(false);ar=false;city.visible=true;exhibit.visible=false;rig.rotation.y=0;scene.background=sky;scene.fog=new T.Fog(sky,55,145);street()});
+  renderer.xr.addEventListener('sessionstart',()=>{
+    setImmersiveLayout(true);ar=renderer.xr.getSession().environmentBlendMode!=='opaque';aerial=false;if(homeMode){homeMode=false;homes.leave();city.visible=true}rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);
+    if(!ar)return;
+    document.body.classList.add('ar-active');document.documentElement.classList.add('ar-active');scene.background=null;scene.fog=null;sun.castShadow=false;
+    arPivot.add(city);city.position.set(0,0,31);arPivot.scale.setScalar(arScale);arPivot.rotation.set(0,0,0);arPivot.visible=true;arPlaced=false;
+    for(let i=0;i<2;i++)renderer.xr.getController(i).visible=false;
+    arHint('Move your phone slowly to find a table or floor, then tap to place Best Budz World.');
+  });
+  renderer.xr.addEventListener('sessionend',()=>{
+    if(ar){scene.add(city);city.position.set(0,0,0);arPivot.visible=false;reticle.visible=false;hitSource?.cancel?.();hitSource=null;hitRequested=false;sun.castShadow=true;for(let i=0;i<2;i++)renderer.xr.getController(i).visible=true}
+    setImmersiveLayout(false);document.body.classList.remove('ar-active');document.documentElement.classList.remove('ar-active');ar=false;city.visible=true;rig.rotation.y=0;scene.background=sky;scene.fog=new T.Fog(sky,55,145);street()});
+  function arFrame(){
+    const frame=renderer.xr.getFrame(),session=renderer.xr.getSession();if(!frame)return;
+    if(!hitRequested){hitRequested=true;session.requestReferenceSpace('viewer').then(space=>session.requestHitTestSource?.({space})).then(src=>{hitSource=src||null}).catch(()=>{hitSource=null;arHint('Surface detection unavailable. Tap to place the district in front of you.')})}
+    if(hitSource){const hits=frame.getHitTestResults(hitSource);const pose=hits.length&&hits[0].getPose(renderer.xr.getReferenceSpace());reticle.visible=!!pose;if(pose)reticle.matrix.fromArray(pose.transform.matrix)}
+    // Until placed, the miniature previews on the reticle (or floats ahead).
+    if(!arPlaced){if(reticle.visible)arPivot.position.setFromMatrixPosition(reticle.matrix);else{const cam=renderer.xr.getCamera(),f=new T.Vector3();cam.getWorldDirection(f);f.y=0;if(f.lengthSq()>1e-4){f.normalize();arPivot.position.copy(cam.getWorldPosition(new T.Vector3())).addScaledVector(f,1.1);arPivot.position.y-=.6}}}
+  }
+  const arControls={exit:()=>renderer.xr.getSession()?.end(),rotate:()=>{arPivot.rotation.y+=Math.PI/8},bigger:()=>{arScale=Math.min(.03,arScale*1.25);arPivot.scale.setScalar(arScale)},smaller:()=>{arScale=Math.max(.003,arScale/1.25);arPivot.scale.setScalar(arScale)}};
   // Standard-mapping Xbox and PlayStation controllers via the browser Gamepad API.
   // Controllers require a user button press to become visible in some browsers.
   let previousButtons=new Set(),controllerSeen=false;
@@ -311,7 +349,7 @@ export async function init(host, places, onVisit) {
     tap(8,()=>{document.querySelector('#walk')?.click()}); // View / Share
     previousButtons=pressed;
   }
-  const clock=new T.Clock(),direction=new T.Vector3();let time=0;
+  const clock=new T.Clock(),direction=new T.Vector3();let time=0,district='plaza';
   document.querySelector('#cameraMode')?.addEventListener('click',()=>setCameraMode(thirdPerson?'first':'third'));
   let frames=0;renderer.setAnimationLoop(()=>{
     const dt=Math.min(clock.getDelta(),.05);time+=dt;
@@ -321,11 +359,17 @@ export async function init(host, places, onVisit) {
     const moving=keys.size>0||[...previousButtons].some(i=>i===6);
     avatarLimbs.forEach((limb,i)=>{limb.rotation.x=T.MathUtils.lerp(limb.rotation.x,moving?Math.sin(time*9+(i%2)*Math.PI)*.35:0,.15)});
     for(const n of npcs){if(n.walking){const t=time*.3+n.phase;n.root.position.z=n.startZ+Math.sin(t)*3;n.root.rotation.y=Math.cos(t)>=0?0:Math.PI;n.limbs.forEach((l,j)=>l.rotation.x=Math.sin(time*5+n.phase)*(j%2?.3:.22)*(j<2?1:-1))}else{n.root.position.y=Math.sin(time*1.4+n.phase)*.012;n.limbs[0].rotation.z=.08+Math.sin(time+n.phase)*.04}}
-    if(dialogue.visible){dialogue.lookAt(camera.getWorldPosition(direction));if(performance.now()>dialogueUntil)dialogue.visible=false}
+    if(dialogue.visible){dialogue.lookAt(camera.getWorldPosition(direction));if(performance.now()>dialogueUntil){dialogue.visible=false;if(focused){focused.focused=false;focused=null}}}
+    if(ar)arFrame();
+    market.update(dt,time);
+    if(!ar&&!aerial&&!homeMode){const px=rig.position.x,pz=rig.position.z;const hitPortal=portalAt(px,pz);if(hitPortal&&portalArmed)transit(hitPortal.id);else if(!hitPortal&&PORTALS.every(p=>Math.hypot(px-p.x,pz-p.z)>1.6))portalArmed=true;
+      const d=districtAt(rig.position.z);if(d!==district){district=d;hooks.onDistrict?.(d)}}
+    // Keep the shadow camera centred on the visitor so both districts get shadows.
+    const sx=Math.round(rig.position.x/8)*8,sz=Math.round(rig.position.z/8)*8;sun.target.position.set(sx,0,sz);sun.position.set(sx-30,45,sz+25);
     renderer.render(scene,camera);
     if(++frames===2)document.querySelector('#viewport').dataset.rendered='true';
   });
   new ResizeObserver(()=>{if(!host.clientWidth||!host.clientHeight)return;camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix();renderer.setSize(host.clientWidth,host.clientHeight)}).observe(host);
   renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();document.querySelector('#worldStatus').textContent='3D paused. Reload to restore, or use destination buttons.'});
-  return {reset,visit,enter:i=>visit(i,true),enterHome,setCameraMode,setAvatarColor,setLookSettings:(sensitivity,inverted)=>{lookSensitivity=sensitivity;invertLook=inverted}};
+  return {reset,visit,enter:i=>visit(i,true),enterHome,setCameraMode,setAvatarColor,setLookSettings:(sensitivity,inverted)=>{lookSensitivity=sensitivity;invertLook=inverted},goDistrict,visitShop,enterShop:i=>visitShop(i,true),focusProduct,ar:arControls,stats:{shops:MARKET_LAYOUT.length,products:market.products.length,npcs:npcs.length}};
 }

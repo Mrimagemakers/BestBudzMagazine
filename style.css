@@ -131,3 +131,32 @@ body.xr-session-active .worldbar,body.xr-session-active header,body.xr-session-a
 /* Avatar and camera settings */
 #cameraMode{background:#b9ff72!important;color:#102017!important;font-weight:700!important}.controls-settings{display:grid;gap:14px}.controls-settings input[type=range]{width:min(440px,100%);accent-color:#b9ff72}.controls-settings input[type=color]{width:80px;height:48px;background:transparent;border:1px solid #ffffff44;border-radius:10px;padding:4px}.controls-settings label{font-weight:600}.controls-settings #resetControls{max-width:200px;border:1px solid #b9ff7270;border-radius:12px;padding:12px}
 @media(max-width:700px){#cameraMode{max-width:93px;line-height:1.1;white-space:normal;font-size:10px!important}}
+
+/* ===== Budz Marketplace & AR tabletop ===== */
+/* Districts & Budz Marketplace */
+.districts{padding-bottom:0}.districts .lede{font-size:13px;margin:-6px 0 18px}
+#districtNav{grid-template-columns:repeat(7,1fr)}#districtNav button[data-district]{background:#2a4a36;border-color:#d5ee8366}
+#panel h3.sub{margin:22px 0 8px;font-size:11px;letter-spacing:2px;color:var(--lime);text-transform:uppercase}
+#panel .products{display:flex;flex-wrap:wrap;gap:8px}#panel button.product{background:#24382d;color:#f6f1df;border:1px solid #ffffff30;font-size:13px;padding:9px 14px}
+#panel button.ghost{background:transparent;color:#d5ee83;border:1px solid #d5ee8360;margin-top:14px}
+#panel .facts{padding-left:18px;line-height:1.6;color:#dfe6d6}#panel .facts li{margin:6px 0}
+#panel .cta{display:inline-block;background:var(--lime);color:#17241c!important;border-radius:24px;padding:11px 19px;text-decoration:none;margin-top:8px}
+#panel .soon{font-size:13px;color:#e8c98f}
+#panel .retail{background:#13241d}#panel .retail select{margin-bottom:6px}#retailList a{display:block;margin-top:10px}#retailList small{display:block;color:#9fb096;font-size:11px}
+@media(max-width:800px){#districtNav{grid-template-columns:repeat(2,1fr)}}
+/* Info panel always above three.js XR buttons (which set inline z-index 999). */
+#xr button{z-index:auto!important}
+#panel{z-index:1000}
+/* ---------- AR: only the HUD is drawn over the camera feed ---------- */
+#arOverlay{display:none}
+body.ar-active,body.ar-active #app,body.ar-active main,body.ar-active .playfield,body.ar-active #viewport{background:transparent!important}
+#arOverlay{position:fixed;inset:0;flex-direction:column;justify-content:space-between;padding:max(14px,env(safe-area-inset-top)) 14px max(18px,env(safe-area-inset-bottom));pointer-events:none;background:transparent;color:#f6f1df;font:15px 'DM Sans',sans-serif}
+body.ar-active #arOverlay{display:flex}
+#arOverlay .arcard{pointer-events:auto;align-self:stretch;background:#122a22d9;border:1px solid #d5ee8355;border-radius:14px;padding:12px 16px;backdrop-filter:blur(8px)}
+#arOverlay .arcard p{margin:6px 0 0;font-size:14px;line-height:1.45;color:#eef3e4}
+#arOverlay .arbtns{pointer-events:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#arOverlay .arbtns button{padding:13px 8px;font-size:14px;box-shadow:0 4px 14px #0006}
+#arOverlay .arexit{grid-column:1/-1;background:#14261f;color:#f6f1df;border:1px solid #ffffff55}
+
+html.ar-active,html.ar-active body{background:transparent!important}
+body.ar-active #app,body.ar-active #gate,body.ar-active #toast{visibility:hidden}
