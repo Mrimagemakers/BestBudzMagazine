@@ -16,6 +16,7 @@ const SOURCES={
 };
 const loader=new GLTFLoader();
 const cache=new Map();
+const available=fetch(new URL('./assets/characters/manifest.json',import.meta.url)).then(r=>r.ok?r.json():{available:[]}).then(m=>new Set(m.available||[])).catch(()=>new Set());
 function fetchAsset(type){
   if(!SOURCES[type])return Promise.resolve(null);
   if(!cache.has(type))cache.set(type,new Promise((resolve,reject)=>{
@@ -24,6 +25,7 @@ function fetchAsset(type){
   return cache.get(type);
 }
 export async function upgradeResident(resident,type,{mobile=false,walking=false}={}){
+  if(!(await available).has(type))return false;
   const asset=await fetchAsset(type);
   if(!asset||!resident?.root?.parent)return false;
   const model=cloneSkeleton(asset.scene);
