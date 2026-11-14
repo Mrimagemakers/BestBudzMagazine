@@ -6,6 +6,7 @@ import {buildUltra} from './ultra.js';
 import {mountXR} from './xr-controls.js';
 import {loadStageOneModels} from './model-assets.js';
 import {createHuman} from './characters.js';
+import {upgradeResident} from './character-models.js';
 
 // All materials are generated locally: no external texture downloads.
 export async function init(host, places, onVisit) {
@@ -294,6 +295,12 @@ export async function init(host, places, onVisit) {
     if(!walking)sign(info[0]+' · '+info[1],x,2.2,z,2.6);
   }
   for(let i=0;i<4;i++)createNPC(i%2?5:-5,-8+i*8,i+7,true);
+  // Replace selected procedural NPCs with skinned, textured GLB characters.
+  // Deferred so the world remains interactive while models load.
+  for(const index of [0,2,4,7,9]){
+    const resident=npcs[index];
+    if(resident)upgradeResident(resident,index===2?'security':'michelle',{mobile:mobileDevice,walking:resident.walking});
+  }
   // In-world dialogue remains readable in a headset without relying on HTML overlays.
   const dialogueCanvas=document.createElement('canvas');dialogueCanvas.width=1024;dialogueCanvas.height=512;
   const dialogueTexture=new T.CanvasTexture(dialogueCanvas);dialogueTexture.colorSpace=T.SRGBColorSpace;
@@ -395,7 +402,7 @@ export async function init(host, places, onVisit) {
     updateCameraMode();
     const moving=keys.size>0||[...previousButtons].some(i=>i===6);
     avatarLimbs.forEach((limb,i)=>{limb.rotation.x=T.MathUtils.lerp(limb.rotation.x,moving?Math.sin(time*9+(i%2)*Math.PI)*.35:0,.15)});
-    for(const n of npcs){if(n.walking){const t=time*.3+n.phase;n.root.position.z=n.startZ+Math.sin(t)*3;n.root.rotation.y=Math.cos(t)>=0?0:Math.PI;n.limbs.forEach((l,j)=>l.rotation.x=Math.sin(time*5+n.phase)*(j%2?.3:.22)*(j<2?1:-1))}else{n.root.position.y=Math.sin(time*1.4+n.phase)*.012;n.limbs[0].rotation.z=.08+Math.sin(time+n.phase)*.04}}
+    for(const n of npcs){if(n.mixer)n.mixer.update(dt);if(n.walking){const t=time*.3+n.phase;n.root.position.z=n.startZ+Math.sin(t)*3;n.root.rotation.y=Math.cos(t)>=0?0:Math.PI;n.limbs.forEach((l,j)=>l.rotation.x=Math.sin(time*5+n.phase)*(j%2?.3:.22)*(j<2?1:-1))}else{n.root.position.y=Math.sin(time*1.4+n.phase)*.012;n.limbs[0].rotation.z=.08+Math.sin(time+n.phase)*.04}}
     if(dialogue.visible){dialogue.lookAt(camera.getWorldPosition(direction));if(performance.now()>dialogueUntil)dialogue.visible=false}
     if(city.visible)updateLighting(rig.position,animateLighting ? time : 0);
     renderer.render(scene,camera);
