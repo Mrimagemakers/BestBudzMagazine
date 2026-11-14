@@ -4,15 +4,22 @@ import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 
 // Public Three.js example character assets. Models are loaded once, cloned with
 // independent skeletons, and safely fall back to the built-in detailed residents.
+// Models are supplied as locally hosted GLBs under assets/characters.
+// Do not download the same demo character repeatedly for different residents.
 const SOURCES={
-  michelle:'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/Michelle.glb',
-  security:'https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/models/gltf/Soldier.glb'
+  'maya.glb':'./assets/characters/maya.glb',
+  'jules.glb':'./assets/characters/jules.glb',
+  'ellis.glb':'./assets/characters/ellis.glb',
+  'devin.glb':'./assets/characters/devin.glb',
+  'simone.glb':'./assets/characters/simone.glb',
+  'morgan.glb':'./assets/characters/morgan.glb'
 };
 const loader=new GLTFLoader();
 const cache=new Map();
 function fetchAsset(type){
+  if(!SOURCES[type])return Promise.resolve(null);
   if(!cache.has(type))cache.set(type,new Promise((resolve,reject)=>{
-    loader.load(SOURCES[type],resolve,undefined,reject);
+    loader.load(new URL(SOURCES[type],import.meta.url).href,resolve,undefined,reject);
   }).catch(error=>{console.warn('Optional character GLB unavailable',type,error);return null}));
   return cache.get(type);
 }
