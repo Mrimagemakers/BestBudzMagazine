@@ -1,4 +1,19 @@
-import {requirePlayer,profileEditor} from './player-auth.js';
+const auth=()=>import('./player-auth.js');
+// Admin preview: the site owner opens ?admin=<key> once per device to skip
+// member sign-in and the age gate. Only the SHA-256 of the key is stored here.
+// Not a security boundary: every page and asset is public on GitHub Pages.
+const ADMIN_KEY_HASH='1131f3173bfd901b19f96fe475e753df98b476f407e552317d1def30c6f8b4d3';
+async function sha256(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+const store={get:k=>{try{return localStorage.getItem(k)}catch{return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}},del:k=>{try{localStorage.removeItem(k)}catch{}}};
+async function adminPreview(){
+ const url=new URL(location.href),given=url.searchParams.get('admin');
+ if(given!==null){url.searchParams.delete('admin');history.replaceState(null,'',url.pathname+url.search+url.hash)}
+ if(given==='off'){store.del('bb-admin');return false}
+ const key=given||store.get('bb-admin');if(!key)return false;
+ const ok=await sha256(key).then(h=>h===ADMIN_KEY_HASH).catch(()=>false);
+ if(ok)store.set('bb-admin',key);else if(!given)store.del('bb-admin');
+ return ok;
+}
 import {isAdult,validRoom} from './logic.js';
 import {HOMES} from './homes.js';
 const $=s=>document.querySelector(s);
@@ -48,14 +63,20 @@ const config=await fetch('./config.json').then(r=>r.json()).catch(()=>({}));
 const api=config.apiBase?new URL(config.apiBase):null;
 if(api&&api.protocol!=='https:'&&api.hostname!=='localhost')throw Error('Community API must use HTTPS');
 function send(data){if(socket?.readyState===1)socket.send(JSON.stringify(data))}
-$('#account').onclick=async()=>{show('<h2>Player profile</h2><p>Loading saved profile…</p>');try{await profileEditor()}catch(e){$('#panelBody').textContent='Profile unavailable: '+e.message}};
+$('#account').onclick=async()=>{show('<h2>Player profile</h2><p>Loading saved profile…</p>');try{await (await auth()).profileEditor()}catch(e){$('#panelBody').textContent='Profile unavailable: '+e.message}};
 /* Legacy community panel retained below for later integration. */
 function legacyAccountPanel(){show('<span class="eyebrow">YOUR COMMUNITY</span><h2>Keep in touch.</h2><p>The 21+ entry is a self-attestation. Verifying an inbox does not verify your age.</p><form id="emailForm"><label>Email address<input type="email" id="email" required autocomplete="email"></label><button '+(!api?'disabled':'')+'>Send verification email</button></form><p id="emailStatus" role="status">'+(!api?'Email service is not configured. No address will be collected.':'A single-use link will be sent to your inbox.')+'</p><h2>Group session</h2><p>Share a room code with friends. Presence and text chat require the community server. Messages are ephemeral; do not share private information.</p><form id="roomForm"><label>Room code<input id="room" required pattern="[a-zA-Z0-9-]{3,40}" maxlength="40" value="best-budz"></label><button '+(!api?'disabled':'')+'>Join group</button></form><p id="roomStatus" role="status">'+(!api?'Remote groups are unavailable until a server is configured.':'Not connected')+'</p><ul id="messages"></ul><form id="chatForm" hidden><label>Message<input id="message" maxlength="300" required></label><button>Send</button><button type="button" id="leave">Leave group</button></form>');
 $('#emailForm').onsubmit=async e=>{e.preventDefault();try{const r=await fetch(new URL('verify/request',api),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('#email').value})});$('#emailStatus').textContent=r.ok?'Check your inbox for a verification link.':'Email could not be sent. Try again later.'}catch{$('#emailStatus').textContent='Email service unavailable.'}};
 $('#roomForm').onsubmit=e=>{e.preventDefault();const room=$('#room').value;if(!validRoom(room))return;socket?.close();const u=new URL('groups',api);u.protocol=u.protocol==='https:'?'wss:':'ws:';u.searchParams.set('room',room);socket=new WebSocket(u);socket.onopen=()=>{$('#roomStatus').textContent='Connected to '+room;$('#chatForm').hidden=false;send({type:'move',place:current})};socket.onclose=()=>{if($('#roomStatus'))$('#roomStatus').textContent='Disconnected';if($('#chatForm'))$('#chatForm').hidden=true};socket.onerror=()=>toast('Group connection failed');socket.onmessage=e=>{try{const m=JSON.parse(e.data);if(!$('#messages'))return;const li=document.createElement('li');li.textContent=m.type==='presence'?m.count+' visitors in this room':m.type==='move'?m.id+' is visiting '+places[m.place][0]:m.id+': '+m.text;$('#messages').append(li);while($('#messages').children.length>30)$('#messages').firstChild.remove()}catch{}}};
 $('#chatForm').onsubmit=e=>{e.preventDefault();send({type:'chat',text:$('#message').value});$('#message').value=''};$('#leave').onclick=()=>socket?.close()};
 $('#gate').hidden=true;
-await requirePlayer();
+const isAdmin=await adminPreview();
+if(isAdmin){
+ sessionStorage.setItem('bb-age','yes');
+ const badge=document.createElement('div');badge.id='adminBadge';badge.innerHTML='<span>ADMIN PREVIEW</span><button type="button">Exit</button>';
+ badge.querySelector('button').onclick=()=>{store.del('bb-admin');sessionStorage.removeItem('bb-age');location.reload()};
+ document.body.append(badge);
+}else{try{await (await auth()).requirePlayer()}catch(e){console.error(e);$('#loginGate').hidden=false;$('#loginStatus').textContent='Sign-in is temporarily unavailable. Please try again in a few minutes.';await new Promise(()=>{})}}
 $('#gate').hidden=sessionStorage.getItem('bb-age')==='yes';
 if(sessionStorage.getItem('bb-age')==='yes')await enter();
 function openSharedPlace(){const match=location.hash.match(/^#place=([0-6])$/);if(match&&sessionStorage.getItem('bb-age')==='yes')visit(+match[1])}

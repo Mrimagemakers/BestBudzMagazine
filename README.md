@@ -27,3 +27,6 @@ Brick, stone, wood and plaster textures are locally generated with bump mapping.
 
 ## Player homes expansion
 The next release is tracked in [GitHub issue #2](https://github.com/Mrimagemakers/BestBudzMagazine/issues/2): verified player accounts, custom avatars, five starter homes, WebXR VR/AR interactions, Stoner TV and Turn Up Music integration. The confirmed Turn Up Music website is https://turnupmusic.online; a playable stream or embeddable player must be verified separately. These features are planned and not yet included in this static release.
+
+## Admin preview (site owner)
+Open the site once per device with `?admin=<your key>` to skip member sign-in and the age gate. A yellow **ADMIN PREVIEW** badge confirms it; tap **Exit** (or open `?admin=off`) to return to the normal visitor flow. Only the SHA-256 hash of the key is in `app.js`; the key is stripped from the address bar after use, so shared links never carry it. This is a convenience, not a security boundary: every page and asset is public on GitHub Pages. To change the key, replace `ADMIN_KEY_HASH` with the SHA-256 of a new one.

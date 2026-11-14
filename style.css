@@ -134,3 +134,8 @@ body.xr-session-active .worldbar,body.xr-session-active header,body.xr-session-a
 
 #xrExitOverlay{position:fixed;inset:0;pointer-events:none}
 #xrExitOverlay button{position:absolute;bottom:max(20px,env(safe-area-inset-bottom));right:20px;pointer-events:auto}
+
+/* Admin preview badge (owner-only link; see app.js) */
+#adminBadge{position:fixed;left:50%;transform:translateX(-50%);top:calc(70px + env(safe-area-inset-top));z-index:60;display:flex;align-items:center;gap:10px;padding:6px 6px 6px 14px;border-radius:999px;background:#f0c74a;color:#1b1b1b;font:700 11px/1 'DM Sans',sans-serif;letter-spacing:1.5px;box-shadow:0 6px 20px #0007}
+#adminBadge button{padding:6px 12px!important;min-height:0!important;border-radius:999px!important;background:#1b1b1b!important;color:#f0c74a!important;border:0!important;font-size:11px!important;letter-spacing:1px}
+body.xr-session-active #adminBadge{display:none}
