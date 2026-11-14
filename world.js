@@ -5,6 +5,7 @@ import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {buildUltra} from './ultra.js';
 import {mountXR} from './xr-controls.js';
 import {loadStageOneModels} from './model-assets.js';
+import {createHuman} from './characters.js';
 
 // All materials are generated locally: no external texture downloads.
 export async function init(host, places, onVisit) {
@@ -281,14 +282,9 @@ export async function init(host, places, onVisit) {
   const animateLighting=!matchMedia('(prefers-reduced-motion: reduce)').matches;
   // Articulated residents: seven hosts and four walking visitors.
   function createNPC(x,z,index,walking){
-    const root=new T.Group();root.position.set(x,0,z);city.add(root);
-    const skin=[0x8e593b,0xbd8660,0x663e2c,0xd7a478][index%4],cloth=[0x526c5b,0xab744d,0x395b70,0x927083][index%4];
-    box(.43,.58,.25,cloth,0,1.17,0,root);sphere(.19,skin,0,1.68,0,root);const hair=sphere(.2,0x29231f,0,1.78,-.025,root);hair.scale.set(1,.65,1);
-    for(const dx of [-.065,.065])sphere(.018,0x191b18,dx,1.7,.17,root);
-    const limbs=[];for(const side of [-1,1]){
-      const arm=new T.Group();arm.position.set(side*.29,1.4,0);root.add(arm);cyl(.065,.48,cloth,0,-.23,0,arm);sphere(.07,skin,0,-.5,0,arm);limbs.push(arm);
-      const leg=new T.Group();leg.position.set(side*.115,.91,0);root.add(leg);cyl(.085,.69,0x303d3c,0,-.34,0,leg);box(.17,.13,.3,0x252b28,0,-.77,.06,leg);limbs.push(leg);
-    }
+    const root=createHuman(index);
+    root.position.set(x,0,z);city.add(root);
+    const limbs=root.userData.limbs;
     const info=walking?['Visitor '+(index-6),'Neighborhood visitor','Welcome to Best Budz World. All seven venues have open entrances. Look for the OPEN signs.']:npcInfo[index];
     root.traverse(o=>{if(o.isMesh)o.userData.npc=info});
     npcs.push({root,limbs,info,walking,startX:x,startZ:z,phase:index*1.7});
@@ -304,20 +300,11 @@ export async function init(host, places, onVisit) {
   for(let i=0;i<3;i++){box(.25,.2,.15,places[6][3],(i-1)*.35,0,0,exhibit);sign(['Blue Dream','Sour Diesel','GDP'][i],(i-1)*.35,.22,0,.3,exhibit)}
   let lookSensitivity=Number(localStorage.getItem('bb-look-sensitivity')||1),invertLook=localStorage.getItem('bb-invert-look')==='true';
   let yaw=0,pitch=0,drag=false,lastX=0,lastY=0,travel=0,ar=false,aerial=false,snapReady=true;
-  // Lightweight local player avatar; no external model or texture downloads.
-  const avatar=new T.Group();rig.add(avatar);avatar.position.set(0,-1.7,0);
-  const avatarMat=(color)=>new T.MeshStandardMaterial({color,roughness:.8});
-  const outfit=avatarMat(localStorage.getItem('bb-avatar-color')||'#64bfa4'),skin=avatarMat('#a56f4e'),pants=avatarMat('#283c50');
-  const avPart=(geo,mat,x,y,z,parent=avatar)=>{const mesh=new T.Mesh(geo,mat);mesh.position.set(x,y,z);parent.add(mesh);return mesh};
-  avPart(new T.CapsuleGeometry(.24,.55,4,8),outfit,0,1.15,0);
-  avPart(new T.SphereGeometry(.22,12,10),skin,0,1.76,0);
-  avPart(new T.SphereGeometry(.23,12,8),avatarMat('#211d1b'),0,1.88,-.035).scale.y=.45;
-  const avatarLimbs=[];
-  for(const side of [-1,1]){
-    const arm=avPart(new T.CapsuleGeometry(.075,.42,3,6),outfit,side*.33,1.19,0);avatarLimbs.push(arm);
-    const leg=avPart(new T.CapsuleGeometry(.09,.55,3,6),pants,side*.12,.48,0);avatarLimbs.push(leg);
-    avPart(new T.BoxGeometry(.19,.12,.32),avatarMat('#172521'),side*.12,.11,-.07);
-  }
+  // Optimized, distinct third-person avatar with realistic streetwear proportions.
+  const avatar=createHuman(4,{outfitColor:localStorage.getItem('bb-avatar-color')||'#64bfa4'});
+  rig.add(avatar);avatar.position.set(0,-1.7,0);
+  const outfit=avatar.userData.jacketMaterial;
+  const avatarLimbs=avatar.userData.limbs;
   let thirdPerson=localStorage.getItem('bb-camera-mode')!=='first';
   function updateCameraMode(){
     const third=thirdPerson&&!renderer.xr.isPresenting&&!aerial;
