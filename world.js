@@ -297,9 +297,9 @@ export async function init(host, places, onVisit) {
   for(let i=0;i<4;i++)createNPC(i%2?5:-5,-8+i*8,i+7,true);
   // Replace selected procedural NPCs with skinned, textured GLB characters.
   // Deferred so the world remains interactive while models load.
-  for(const index of [0,2,4,7,9]){
+  for(const index of [2]){
     const resident=npcs[index];
-    if(resident)upgradeResident(resident,index===2?'security':'michelle',{mobile:mobileDevice,walking:resident.walking});
+    if(resident)upgradeResident(resident,'security',{mobile:mobileDevice,walking:resident.walking});
   }
   // In-world dialogue remains readable in a headset without relying on HTML overlays.
   const dialogueCanvas=document.createElement('canvas');dialogueCanvas.width=1024;dialogueCanvas.height=512;
