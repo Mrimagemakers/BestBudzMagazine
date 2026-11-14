@@ -139,3 +139,28 @@ body.xr-session-active .worldbar,body.xr-session-active header,body.xr-session-a
 #adminBadge{position:fixed;left:50%;transform:translateX(-50%);top:calc(70px + env(safe-area-inset-top));z-index:60;display:flex;align-items:center;gap:10px;padding:6px 6px 6px 14px;border-radius:999px;background:#f0c74a;color:#1b1b1b;font:700 11px/1 'DM Sans',sans-serif;letter-spacing:1.5px;box-shadow:0 6px 20px #0007}
 #adminBadge button{padding:6px 12px!important;min-height:0!important;border-radius:999px!important;background:#1b1b1b!important;color:#f0c74a!important;border:0!important;font-size:11px!important;letter-spacing:1px}
 body.xr-session-active #adminBadge{display:none}
+
+
+/* 2026 visual refresh: translucent editorial chrome, cinematic presentation.
+   World rendering remains in WebGL; these styles do not affect XR controls. */
+:root{--gold:#d9b87a;--teal:#79dfc2;--panel-surface:rgba(15,30,30,.87);--glass-stroke:rgba(218,239,220,.19)}
+body{background:radial-gradient(ellipse at 55% -12%,#27464a 0%,#101c1b 56%,#0b1414 100%)}
+header{background:linear-gradient(115deg,rgba(9,25,26,.96),rgba(25,45,43,.9));backdrop-filter:blur(18px);box-shadow:0 10px 42px #0004;position:relative;z-index:3}
+.brand{color:var(--teal);text-shadow:0 0 22px #61dbb541}
+.brand span{color:#f8efdb}
+.eyebrow{color:var(--gold);font-weight:700}
+.intro h1{letter-spacing:-.035em;text-shadow:0 2px 28px #000a}
+.intro h1 em{color:#b7efdb}
+#viewport{background:linear-gradient(145deg,#526d6c,#1a3533 54%,#101a1c);border:1px solid #b9dacf24;box-shadow:inset 0 0 90px #081919a6}
+#worldStatus{background:#0d2121c9;border:1px solid var(--glass-stroke);border-radius:999px;padding:9px 13px;backdrop-filter:blur(12px);color:#eff6e7;font-weight:600}
+.worldbar{background:#122524ed;box-shadow:0 8px 26px #0004;gap:10px}
+.worldbar button,header button{transition:transform .18s ease,background .18s ease,box-shadow .18s ease;border-radius:14px}
+.worldbar button:hover,header button:hover{transform:translateY(-1px)}
+.destinations{background:linear-gradient(180deg,#102220,#112b27)}
+.destinations nav button,nav button{background:linear-gradient(145deg,#26463d,#17312d);border:1px solid var(--glass-stroke);box-shadow:0 12px 28px #0003;min-height:106px;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.destinations nav button:hover,nav button:hover{transform:translateY(-3px);border-color:#7ad8c0;box-shadow:0 16px 36px #0005}
+#panel{background:var(--panel-surface);border-color:var(--glass-stroke);box-shadow:0 18px 60px #0009}
+#gate{background:radial-gradient(circle at 78% 22%,#315b59 0%,transparent 36%),radial-gradient(circle at 20% 70%,#33442e 0%,transparent 42%),#0b1718}
+#loginGate{background:radial-gradient(circle at 80% 10%,#244b49,transparent 48%),#0d1c1b}
+@media(max-width:800px){#worldStatus{max-width:200px;right:3%;padding:7px 9px}.intro h1{text-shadow:0 2px 18px #000c}.destinations nav button{min-height:88px}}
+@media(prefers-reduced-motion:reduce){.worldbar button,.destinations nav button,nav button,header button{transition:none!important}}
