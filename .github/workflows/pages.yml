@@ -20,7 +20,9 @@ jobs:
       - run: npm test
       - run: node --check app.js && node --check player-auth.js && node --check world.js && node --check model-assets.js && node --check homes.js && node --check ultra.js && node --check xr-controls.js && node --check server/server.js
   deploy:
-    if: github.ref == 'refs/heads/main'
+    # Pages' github-pages environment currently only approves feat/best-budz-world;
+    # main also deploys once it is added under Settings → Environments → github-pages.
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/best-budz-world'
     needs: validate
     runs-on: ubuntu-latest
     permissions:
