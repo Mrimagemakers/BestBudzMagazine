@@ -26,10 +26,10 @@ export function mountXR(root, renderer, selectMode, report, xr = navigator.xr) {
       refresh();
       let session;
       try {
-        const optionalFeatures = ['local-floor', 'bounded-floor', 'layers'];
+        const optionalFeatures = ['local-floor', 'bounded-floor'];
         const options = {optionalFeatures};
         if (mode === 'immersive-ar') {
-          optionalFeatures.push('dom-overlay');
+          optionalFeatures.push('dom-overlay', 'hit-test');
           options.domOverlay = {root: exitOverlay};
         }
         session = await xr.requestSession(mode, options);
@@ -43,9 +43,10 @@ export function mountXR(root, renderer, selectMode, report, xr = navigator.xr) {
         renderer.xr.setReferenceSpaceType(mode === 'immersive-ar' ? 'local' : 'local-floor');
         await renderer.xr.setSession(session);
         exitOverlay.hidden = !session.domOverlayState;
-      } catch {
+      } catch (error) {
         if (session) await session.end().catch(() => {});
-        report(label + ' could not start on this device.');
+        report(label + ' could not start: ' + (error?.message || 'Check browser permissions and device WebXR support.'));
+        console.warn('WebXR session error',mode,error);
       } finally {
         pending = false;
         refresh();
