@@ -330,6 +330,18 @@ export async function init(host, places, onVisit) {
   const arTitle=sign('BEST BUDZ · AR EXHIBIT',0,.54,0,1.85,exhibit);
   const arReticle=new T.Mesh(new T.RingGeometry(.055,.075,32),new T.MeshBasicMaterial({color:0x7af8cf,side:T.DoubleSide,depthTest:false}));
   arReticle.visible=false;scene.add(arReticle);
+  // Camera-attached, unlit calibration target: visible even without hit testing,
+  // environmental lighting, surface detection or world-space tracking.
+  const arDiagnostic=new T.Group();
+  const diagMaterial=new T.MeshBasicMaterial({color:0x00ff99,depthTest:false,depthWrite:false,side:T.DoubleSide});
+  const diagFrame=new T.Mesh(new T.TorusGeometry(.23,.028,12,48),diagMaterial);
+  arDiagnostic.add(diagFrame);
+  const diagCore=new T.Mesh(new T.BoxGeometry(.19,.19,.19),new T.MeshBasicMaterial({color:0xffd54a,depthTest:false,depthWrite:false}));
+  arDiagnostic.add(diagCore);
+  arDiagnostic.position.set(0,0,-.85);
+  arDiagnostic.renderOrder=999;
+  arDiagnostic.traverse(node=>{if(node.isMesh)node.renderOrder=999});
+  camera.add(arDiagnostic);arDiagnostic.visible=false;
   const arForward=new T.Vector3(),arHead=new T.Vector3(),arTarget=new T.Vector3();
   function positionARExhibit(){
     const xrCamera=renderer.xr.getCamera();
@@ -399,8 +411,8 @@ export async function init(host, places, onVisit) {
     }
     if(!active)hiddenForXR.clear();
   }
-  renderer.xr.addEventListener('sessionstart',()=>{setImmersiveLayout(true);ar=xrMode==='immersive-ar';renderer.shadowMap.enabled=false;city.visible=!ar;exhibit.visible=ar;aerial=false;if(homeMode){homeMode=false;homes.leave()}rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);if(ar){scene.background=null;scene.fog=null;positionARExhibit();arReticle.visible=true;}});
-  renderer.xr.addEventListener('sessionend',()=>{setImmersiveLayout(false);renderer.shadowMap.enabled=!mobileDevice;ar=false;city.visible=true;exhibit.visible=false;arReticle.visible=false;rig.rotation.y=0;scene.background=sky;scene.fog=new T.FogExp2(sky,.0075);street()});
+  renderer.xr.addEventListener('sessionstart',()=>{setImmersiveLayout(true);ar=xrMode==='immersive-ar';renderer.shadowMap.enabled=false;city.visible=!ar;exhibit.visible=ar;aerial=false;if(homeMode){homeMode=false;homes.leave()}rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);if(ar){scene.background=null;scene.fog=null;positionARExhibit();arReticle.visible=true;arDiagnostic.visible=true;}});
+  renderer.xr.addEventListener('sessionend',()=>{setImmersiveLayout(false);renderer.shadowMap.enabled=!mobileDevice;ar=false;city.visible=true;exhibit.visible=false;arReticle.visible=false;arDiagnostic.visible=false;rig.rotation.y=0;scene.background=sky;scene.fog=new T.FogExp2(sky,.0075);street()});
   // Standard-mapping Xbox and PlayStation controllers via the browser Gamepad API.
   // Controllers require a user button press to become visible in some browsers.
   let previousButtons=new Set(),controllerSeen=false;
@@ -439,6 +451,7 @@ export async function init(host, places, onVisit) {
       arReticle.position.copy(arHead).addScaledVector(arForward,1.05);
       arReticle.quaternion.copy(xrCamera.quaternion);
       arRing.rotation.z+=dt*.25;
+      arDiagnostic.rotation.y+=dt*.8;
     }
     const moving=keys.size>0||[...previousButtons].some(i=>i===6);
     avatarLimbs.forEach((limb,i)=>{limb.rotation.x=T.MathUtils.lerp(limb.rotation.x,moving?Math.sin(time*9+(i%2)*Math.PI)*.35:0,.15)});
