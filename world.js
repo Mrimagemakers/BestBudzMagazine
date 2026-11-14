@@ -317,7 +317,31 @@ export async function init(host, places, onVisit) {
   const dialogue=new T.Mesh(new T.PlaneGeometry(2.3,1.15),new T.MeshBasicMaterial({map:dialogueTexture,side:T.DoubleSide}));city.add(dialogue);dialogue.visible=false;let dialogueUntil=0;
   function speak(info,position){const g=dialogueCanvas.getContext('2d');g.fillStyle='#132e27';g.fillRect(0,0,1024,512);g.strokeStyle='#d4d9a0';g.lineWidth=8;g.strokeRect(8,8,1008,496);g.fillStyle='#e5dea8';g.font='bold 45px sans-serif';g.fillText(info[0]+' / '+info[1],40,75,950);g.fillStyle='#fff7e5';g.font='37px sans-serif';let line='',y=150;for(const word of info[2].split(' ')){if(g.measureText(line+word).width>925){g.fillText(line,40,y);line='';y+=52}line+=word+' '}g.fillText(line,40,y);g.font='26px sans-serif';g.fillStyle='#b8c6b3';g.fillText('NPC · scripted conversation',40,465);dialogueTexture.needsUpdate=true;dialogue.position.copy(position).add(new T.Vector3(0,2.7,0));dialogue.visible=true;dialogueUntil=performance.now()+14000;document.querySelector('#worldStatus').textContent=info[0]+': '+info[2]}
   const exhibit=new T.Group();scene.add(exhibit);exhibit.visible=false;
-  for(let i=0;i<3;i++){box(.25,.2,.15,places[6][3],(i-1)*.35,0,0,exhibit);sign(['Blue Dream','Sour Diesel','GDP'][i],(i-1)*.35,.22,0,.3,exhibit)}
+  // A visible, life-size AR showcase, placed in front of the user's headset.
+  const arStand=new T.Mesh(new T.CylinderGeometry(.63,.7,.075,32),new T.MeshStandardMaterial({color:0x183c37,metalness:.35,roughness:.45}));
+  arStand.position.y=-.48;exhibit.add(arStand);
+  const arRing=new T.Mesh(new T.TorusGeometry(.61,.025,8,48),new T.MeshBasicMaterial({color:0x72edc2}));
+  arRing.rotation.x=Math.PI/2;arRing.position.y=-.43;exhibit.add(arRing);
+  for(let i=0;i<3;i++){
+    const x=(i-1)*.37;
+    box(.25,.28,.2,places[6][3],x,-.23,0,exhibit);
+    sign(['BLUE DREAM','SOUR DIESEL','GDP'][i],x,.01,.13,.33,exhibit);
+  }
+  const arTitle=sign('BEST BUDZ · AR EXHIBIT',0,.54,0,1.85,exhibit);
+  const arReticle=new T.Mesh(new T.RingGeometry(.055,.075,32),new T.MeshBasicMaterial({color:0x7af8cf,side:T.DoubleSide,depthTest:false}));
+  arReticle.visible=false;scene.add(arReticle);
+  const arForward=new T.Vector3(),arHead=new T.Vector3(),arTarget=new T.Vector3();
+  function positionARExhibit(){
+    const xrCamera=renderer.xr.getCamera();
+    xrCamera.getWorldPosition(arHead);
+    xrCamera.getWorldDirection(arForward);
+    arForward.y=0;
+    if(arForward.lengthSq()<.001)arForward.set(0,0,-1);
+    arForward.normalize();
+    exhibit.position.copy(arHead).addScaledVector(arForward,1.45);
+    exhibit.position.y=arHead.y-.24;
+    exhibit.rotation.y=Math.atan2(-arForward.x,-arForward.z);
+  }
   let lookSensitivity=Number(localStorage.getItem('bb-look-sensitivity')||1),invertLook=localStorage.getItem('bb-invert-look')==='true';
   let yaw=0,pitch=0,drag=false,lastX=0,lastY=0,travel=0,ar=false,aerial=false,snapReady=true;
   // Optimized, distinct third-person avatar with realistic streetwear proportions.
@@ -361,7 +385,7 @@ export async function init(host, places, onVisit) {
   mountXR(document.querySelector('#xr'),renderer,mode=>{xrMode=mode},message=>{
     document.querySelector('#worldStatus').textContent=message;
   });
-  for(let i=0;i<2;i++){const c=renderer.xr.getController(i);rig.add(c);const line=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(),new T.Vector3(0,0,-12)]),new T.LineBasicMaterial({color:0xd5ee83}));c.add(line);c.addEventListener('select',()=>{if(ar){return}const rotation=new T.Matrix4().extractRotation(c.matrixWorld);ray.ray.origin.setFromMatrixPosition(c.matrixWorld);ray.ray.direction.set(0,0,-1).applyMatrix4(rotation);selectRay()})}
+  for(let i=0;i<2;i++){const c=renderer.xr.getController(i);rig.add(c);const line=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(),new T.Vector3(0,0,-12)]),new T.LineBasicMaterial({color:0xd5ee83}));c.add(line);c.addEventListener('select',()=>{if(ar){positionARExhibit();return}const rotation=new T.Matrix4().extractRotation(c.matrixWorld);ray.ray.origin.setFromMatrixPosition(c.matrixWorld);ray.ray.direction.set(0,0,-1).applyMatrix4(rotation);selectRay()})}
   // Immersive AR must never share the camera view with page banners or panels.
   // Inline important styles also protect against stale mobile stylesheet caches.
   const xrObstructions=['.intro','#worldStatus','#toast','#panel','header','.worldbar','.destinations','footer'];
@@ -375,8 +399,8 @@ export async function init(host, places, onVisit) {
     }
     if(!active)hiddenForXR.clear();
   }
-  renderer.xr.addEventListener('sessionstart',()=>{setImmersiveLayout(true);ar=xrMode==='immersive-ar';renderer.shadowMap.enabled=false;city.visible=!ar;exhibit.visible=ar;aerial=false;if(homeMode){homeMode=false;homes.leave()}rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);if(ar){scene.background=null;scene.fog=null;exhibit.position.set(0,1.2,-1)}});
-  renderer.xr.addEventListener('sessionend',()=>{setImmersiveLayout(false);renderer.shadowMap.enabled=!mobileDevice;ar=false;city.visible=true;exhibit.visible=false;rig.rotation.y=0;scene.background=sky;scene.fog=new T.Fog(sky,55,145);street()});
+  renderer.xr.addEventListener('sessionstart',()=>{setImmersiveLayout(true);ar=xrMode==='immersive-ar';renderer.shadowMap.enabled=false;city.visible=!ar;exhibit.visible=ar;aerial=false;if(homeMode){homeMode=false;homes.leave()}rig.position.set(0,0,ar?0:30);rig.rotation.y=0;camera.position.set(0,0,0);camera.rotation.set(0,0,0);if(ar){scene.background=null;scene.fog=null;positionARExhibit();arReticle.visible=true;}});
+  renderer.xr.addEventListener('sessionend',()=>{setImmersiveLayout(false);renderer.shadowMap.enabled=!mobileDevice;ar=false;city.visible=true;exhibit.visible=false;arReticle.visible=false;rig.rotation.y=0;scene.background=sky;scene.fog=new T.FogExp2(sky,.0075);street()});
   // Standard-mapping Xbox and PlayStation controllers via the browser Gamepad API.
   // Controllers require a user button press to become visible in some browsers.
   let previousButtons=new Set(),controllerSeen=false;
@@ -410,6 +434,12 @@ export async function init(host, places, onVisit) {
     if(!renderer.xr.isPresenting){gamepadInput(dt);let f=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));let s=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));const len=Math.max(1,Math.hypot(f,s));move((Math.sin(yaw)*f+Math.cos(yaw)*s)*dt*3.4/len,(Math.cos(yaw)*f-Math.sin(yaw)*s)*dt*3.4/len)}
     else if(!ar){for(const input of renderer.xr.getSession().inputSources){if(!input.gamepad)continue;const axes=input.gamepad.axes;const ax=axes.length>=4?axes[2]:axes[0]||0,az=axes.length>=4?axes[3]:axes[1]||0;if(input.handedness==='left'){renderer.xr.getCamera().getWorldDirection(direction);direction.y=0;direction.normalize();const f=Math.abs(az)>.18?-az:0,s=Math.abs(ax)>.18?ax:0;move((direction.x*f-direction.z*s)*dt*2.4,(direction.z*f+direction.x*s)*dt*2.4)}if(input.handedness==='right'){if(Math.abs(ax)<.3)snapReady=true;if(Math.abs(ax)>.7&&snapReady){rig.rotation.y-=Math.sign(ax)*Math.PI/6;snapReady=false}}}}
     updateCameraMode();
+    if(ar && renderer.xr.isPresenting){
+      const xrCamera=renderer.xr.getCamera();xrCamera.getWorldPosition(arHead);xrCamera.getWorldDirection(arForward);
+      arReticle.position.copy(arHead).addScaledVector(arForward,1.05);
+      arReticle.quaternion.copy(xrCamera.quaternion);
+      arRing.rotation.z+=dt*.25;
+    }
     const moving=keys.size>0||[...previousButtons].some(i=>i===6);
     avatarLimbs.forEach((limb,i)=>{limb.rotation.x=T.MathUtils.lerp(limb.rotation.x,moving?Math.sin(time*9+(i%2)*Math.PI)*.35:0,.15)});
     for(const n of npcs){if(n.mixer)n.mixer.update(dt);if(n.walking){const t=time*.3+n.phase;n.root.position.z=n.startZ+Math.sin(t)*3;n.root.rotation.y=Math.cos(t)>=0?0:Math.PI;n.limbs.forEach((l,j)=>l.rotation.x=Math.sin(time*5+n.phase)*(j%2?.3:.22)*(j<2?1:-1))}else{n.root.position.y=Math.sin(time*1.4+n.phase)*.012;n.limbs[0].rotation.z=.08+Math.sin(time+n.phase)*.04}}
