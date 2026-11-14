@@ -10,8 +10,8 @@ import {createHuman} from './characters.js';
 // All materials are generated locally: no external texture downloads.
 export async function init(host, places, onVisit) {
   const scene = new T.Scene();
-  const sky = new T.Color('#727b92');
-  scene.background = sky; scene.fog = new T.Fog(sky, 55, 145);
+  const sky = new T.Color('#738a9a');
+  scene.background = sky; scene.fog = new T.FogExp2(sky, .0075);
   const camera = new T.PerspectiveCamera(65, host.clientWidth / host.clientHeight, .06, 180);
   camera.rotation.order = 'YXZ';
   const rig = new T.Group(); rig.add(camera); scene.add(rig);
@@ -24,7 +24,8 @@ export async function init(host, places, onVisit) {
   renderer.xr.setFramebufferScaleFactor(headset ? .85 : 1);
   renderer.xr.setFoveation(headset ? .8 : .5);
   renderer.shadowMap.enabled = !mobileDevice; renderer.shadowMap.type = T.PCFShadowMap;
-  renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+  renderer.outputColorSpace = T.SRGBColorSpace;
+  renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.08;
   host.append(renderer.domElement);
   if (!mobileDevice) {
     const environment = new RoomEnvironment();
@@ -34,10 +35,12 @@ export async function init(host, places, onVisit) {
     environment.dispose();
     pmrem.dispose();
   }
-  scene.add(new T.HemisphereLight(0xdce3ff, 0x87705e, 1.55));
+  scene.add(new T.HemisphereLight(0xc8e5ff, 0x716252, 1.18));
+  const bounce = new T.DirectionalLight(0x86bfc1, mobileDevice ? .27 : .44);
+  bounce.position.set(14,11,-19);scene.add(bounce);
   const sun = new T.DirectionalLight(0xffcf9b, 2.4);
-  sun.position.set(-33, 29, 20); sun.castShadow = true;
-  sun.shadow.mapSize.set(1536,1536);
+  sun.position.set(-33, 29, 20); sun.castShadow = !mobileDevice;
+  sun.shadow.mapSize.set(mobileDevice?512:2048,mobileDevice?512:2048);
   Object.assign(sun.shadow.camera, {left:-48,right:48,top:48,bottom:-48,near:1,far:130});
   sun.shadow.bias = -.0004; sun.shadow.normalBias = .04; scene.add(sun);
   const city = new T.Group(); scene.add(city);
