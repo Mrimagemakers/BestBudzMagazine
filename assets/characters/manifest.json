@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "available": [],
+  "notes": "Only add a model filename to available after uploading and verifying the corresponding rigged GLB file."
+}
