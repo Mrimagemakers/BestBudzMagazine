@@ -164,3 +164,16 @@ header{background:linear-gradient(115deg,rgba(9,25,26,.96),rgba(25,45,43,.9));ba
 #loginGate{background:radial-gradient(circle at 80% 10%,#244b49,transparent 48%),#0d1c1b}
 @media(max-width:800px){#worldStatus{max-width:200px;right:3%;padding:7px 9px}.intro h1{text-shadow:0 2px 18px #000c}.destinations nav button{min-height:88px}}
 @media(prefers-reduced-motion:reduce){.worldbar button,.destinations nav button,nav button,header button{transition:none!important}}
+
+/* ===== Budz Marketplace (District 02) ===== */
+.districts{padding-bottom:0}.districts .lede{font-size:14px;margin:-12px 0 20px;color:#c9d6cf}
+#districtNav button[data-district]{border-color:#b9ff7266;background:linear-gradient(145deg,#2f5a3e,#17312d)}
+#panel h3.sub{margin:22px 0 8px;font-size:11px;letter-spacing:2px;color:var(--lime);text-transform:uppercase}
+#panel .products{display:flex;flex-wrap:wrap;gap:8px}
+#panel button.product{background:linear-gradient(145deg,#26463d,#17312d);color:#f6f1df;border:1px solid var(--glass-stroke,#ffffff30);font-size:13px;padding:9px 14px;min-height:0}
+#panel button.ghost{background:transparent;color:var(--lime);border:1px solid #b9ff7260;margin-top:14px}
+#panel .facts{padding-left:18px;line-height:1.6;color:#dfe6d6}#panel .facts li{margin:6px 0}
+#panel .cta{display:inline-block;background:var(--lime);color:#07130f!important;border-radius:24px;padding:11px 19px;text-decoration:none;margin-top:8px}
+#panel .soon{font-size:13px;color:var(--gold,#e8c98f)}
+#panel .retail{background:#0d1d19cc}#panel .retail select{margin-bottom:6px}
+#retailList a{display:block;margin-top:10px}#retailList small{display:block;color:#9fb096;font-size:11px}

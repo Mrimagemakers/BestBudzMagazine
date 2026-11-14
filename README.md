@@ -30,3 +30,8 @@ The next release is tracked in [GitHub issue #2](https://github.com/Mrimagemaker
 
 ## Admin preview (site owner)
 Open the site once per device with `?admin=<your key>` to skip member sign-in and the age gate. A yellow **ADMIN PREVIEW** badge confirms it; tap **Exit** (or open `?admin=off`) to return to the normal visitor flow. Only the SHA-256 hash of the key is in `app.js`; the key is stripped from the address bar after use, so shared links never carry it. This is a convenience, not a security boundary: every page and asset is public on GitHub Pages. To change the key, replace `ADMIN_KEY_HASH` with the SHA-256 of a new one.
+
+## Budz Marketplace (District 02)
+A walkable, string-lit boulevard north of the Central Plaza, reached on foot through the two gateways at the plaza's north end or by stepping into the glowing transit ring. Five walk-in storefronts (Dispensary Showroom, Accessories, Fashion Boutique, Best Budz Shop, Art Gallery), the Budz Garden pocket park, a host in every shop and three walking regulars.
+
+Every display is an interactive 3D product: tap it to spin it up, see an in-world info card (readable in VR) and open the details panel. The Dispensary Showroom is education only: category guides, label literacy and reading a lab report (COA). Retailer links appear only after a visitor picks a jurisdiction, and only for entries in `marketplace-data.js` marked `verified: true` with an https URL; the list ships empty. Merch, fashion and art link to `MARKET_CONFIG.shopUrl` once set. Edit shops and products in `marketplace-data.js`.

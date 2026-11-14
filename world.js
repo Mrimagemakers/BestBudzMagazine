@@ -1,6 +1,7 @@
 import * as T from 'three';
 import {buildHomes,HOMES} from './homes.js?v=textures-7';
-import {WORLD_COORDS,buildingWalls,blockedAt} from './logic.js';
+import {WORLD_COORDS,buildingWalls,blockedAt,walkable,districtAt,portalAt,PORTALS,MARKET_LAYOUT,toWorld} from './logic.js';
+import {buildMarketplace} from './marketplace.js?v=market-2';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {buildUltra} from './ultra.js';
 import {mountXR} from './xr-controls.js';
@@ -9,7 +10,7 @@ import {createHuman} from './characters.js';
 import {upgradeResident} from './character-models.js';
 
 // All materials are generated locally: no external texture downloads.
-export async function init(host, places, onVisit) {
+export async function init(host, places, onVisit, hooks = {}) {
   const scene = new T.Scene();
   const sky = new T.Color('#738a9a');
   scene.background = sky; scene.fog = new T.FogExp2(sky, .0075);
@@ -43,7 +44,7 @@ export async function init(host, places, onVisit) {
   sun.position.set(-33, 29, 20); sun.castShadow = !mobileDevice;
   sun.shadow.mapSize.set(mobileDevice?512:2048,mobileDevice?512:2048);
   Object.assign(sun.shadow.camera, {left:-48,right:48,top:48,bottom:-48,near:1,far:130});
-  sun.shadow.bias = -.0004; sun.shadow.normalBias = .04; scene.add(sun);
+  sun.shadow.bias = -.0004; sun.shadow.normalBias = .04; scene.add(sun); scene.add(sun.target);
   const city = new T.Group(); scene.add(city);
   loadStageOneModels(city,mobileDevice);
   const homes=buildHomes(scene);let homeMode=false;
@@ -179,6 +180,7 @@ export async function init(host, places, onVisit) {
     attempts++;
     const x=(rand()-.5)*91,z=(rand()-.5)*95;
     if(Math.abs(x)<28&&z>-30&&z<35)continue; // keep roads and venues clear
+    if(Math.abs(x)<27&&z<=-30)continue; // and the Budz Marketplace district
     dummy.position.set(x,-.03,z);dummy.rotation.set(0,rand()*6.28,(rand()-.5)*.3);
     dummy.scale.set(.7+rand()*.9,.65+rand()*1.6,.7+rand()*.9);
     dummy.updateMatrix();blades.setMatrixAt(planted,dummy.matrix);
@@ -230,7 +232,7 @@ export async function init(host, places, onVisit) {
     const x=i%2===0?-35-rand()*9:35+rand()*9,z=-42+Math.floor(i/2)*7+rand()*2;
     tree(x,z,.75+rand()*.6);
   }
-  for(let i=0;i<14;i++){const x=(rand()-.5)*90,z=i%2===0?-39-rand()*7:40+rand()*7;tree(x,z,.7+rand()*.5)}
+  for(let i=0;i<14;i++){const north=i%2===0,side=rand()<.5?-1:1,x=north?side*(29+rand()*16):(rand()-.5)*90,z=north?-39-rand()*7:40+rand()*7;tree(x,z,.7+rand()*.5)}
   for(const part of treeParts)part.instanceMatrix.needsUpdate=true;
   // Architectural trim and street detail to break up flat facade geometry.
   const concrete=surface('tile','#8e9290');
@@ -281,20 +283,22 @@ export async function init(host, places, onVisit) {
     if(i===6){for(let k=0;k<3;k++){const dx=(k-1)*2.8;box(1,.9,.8,stone,x+dx,.5,z-2);plant(x+dx,z-2,.7);sign(['BLUE DREAM','SOUR DIESEL','GDP'][k],x+dx,.75,z-1.55,1);const plaque=box(1,.2,.02,accent,x+dx,1.45,z-1.6);plaque.userData.place=6}sign('EDUCATIONAL EXHIBITS · BATCH UNVERIFIED',x,2.1,z-4.3,7)}
     createNPC(x+3.4,z+1.8,i,false);
   });
-  for(const z of [-24,-5,14,31])for(const x of [-8,8]){cyl(.06,3.7,metal,x,1.85,z);sphere(.18,new T.MeshStandardMaterial({color:0xffe9b5,emissive:0xffcb76,emissiveIntensity:.6}),x,3.7,z);box(1.7,.16,.5,wood,x,.55,z+1);box(.1,.55,.4,metal,x-.6,.25,z+1);box(.1,.55,.4,metal,x+.6,.25,z+1)}
+  for(const z of [-5,14,31])for(const x of [-8,8]){cyl(.06,3.7,metal,x,1.85,z);sphere(.18,new T.MeshStandardMaterial({color:0xffe9b5,emissive:0xffcb76,emissiveIntensity:.6}),x,3.7,z);box(1.7,.16,.5,wood,x,.55,z+1);box(.1,.55,.4,metal,x-.6,.25,z+1);box(.1,.55,.4,metal,x+.6,.25,z+1)}
   const updateLighting=buildUltra(city,coords,surface,sign,mobileDevice);
   const animateLighting=!matchMedia('(prefers-reduced-motion: reduce)').matches;
   // Articulated residents: seven hosts and four walking visitors.
-  function createNPC(x,z,index,walking){
+  function createNPC(x,z,index,walking,custom=null,rot=0){
     const root=createHuman(index);
-    root.position.set(x,0,z);city.add(root);
+    root.position.set(x,0,z);root.rotation.y=rot;city.add(root);
     const limbs=root.userData.limbs;
-    const info=walking?['Visitor '+(index-6),'Neighborhood visitor','Welcome to Best Budz World. All seven venues have open entrances. Look for the OPEN signs.']:npcInfo[index];
+    const info=custom||(walking?['Visitor '+(index-6),'Neighborhood visitor','Welcome to Best Budz World. All seven venues have open entrances, and the Budz Marketplace is through the gateways at the north end of the plaza.']:npcInfo[index]);
     root.traverse(o=>{if(o.isMesh)o.userData.npc=info});
     npcs.push({root,limbs,info,walking,startX:x,startZ:z,phase:index*1.7});
-    if(!walking)sign(info[0]+' · '+info[1],x,2.2,z,2.6);
+    if(!walking){const tag=sign(info[0]+' · '+info[1],x,2.2,z,2.6);tag.rotation.y=rot}
   }
   for(let i=0;i<4;i++)createNPC(i%2?5:-5,-8+i*8,i+7,true);
+  const market=buildMarketplace({T,city,box,cyl,sphere,mesh,mat,walls,wood,stone,plaster,brick:surface('brick','#8a5a45'),metal,glass,surface,plant,createNPC});
+  [['Kai','Market regular','The Dispensary Showroom is education only. Take the lessons there before you visit a licensed store.'],['Bree','Market regular','Best Budz Shop has back issues. The gallery is taking artist submissions this season.'],['Omar','Market regular','The transit ring at the far end takes you straight back to the Central Plaza.']].forEach((info,i)=>createNPC(i===1?4.5:-4.5,-56-i*13,30+i,true,info));
   // Replace selected procedural NPCs with skinned, textured GLB characters.
   // Deferred so the world remains interactive while models load.
   // Six unique resident slots: source-controlled GLB files can be added without
@@ -315,7 +319,7 @@ export async function init(host, places, onVisit) {
   const dialogueCanvas=document.createElement('canvas');dialogueCanvas.width=1024;dialogueCanvas.height=512;
   const dialogueTexture=new T.CanvasTexture(dialogueCanvas);dialogueTexture.colorSpace=T.SRGBColorSpace;
   const dialogue=new T.Mesh(new T.PlaneGeometry(2.3,1.15),new T.MeshBasicMaterial({map:dialogueTexture,side:T.DoubleSide}));city.add(dialogue);dialogue.visible=false;let dialogueUntil=0;
-  function speak(info,position){const g=dialogueCanvas.getContext('2d');g.fillStyle='#132e27';g.fillRect(0,0,1024,512);g.strokeStyle='#d4d9a0';g.lineWidth=8;g.strokeRect(8,8,1008,496);g.fillStyle='#e5dea8';g.font='bold 45px sans-serif';g.fillText(info[0]+' / '+info[1],40,75,950);g.fillStyle='#fff7e5';g.font='37px sans-serif';let line='',y=150;for(const word of info[2].split(' ')){if(g.measureText(line+word).width>925){g.fillText(line,40,y);line='';y+=52}line+=word+' '}g.fillText(line,40,y);g.font='26px sans-serif';g.fillStyle='#b8c6b3';g.fillText('NPC · scripted conversation',40,465);dialogueTexture.needsUpdate=true;dialogue.position.copy(position).add(new T.Vector3(0,2.7,0));dialogue.visible=true;dialogueUntil=performance.now()+14000;document.querySelector('#worldStatus').textContent=info[0]+': '+info[2]}
+  function speak(info,position,footer='NPC · scripted conversation',lift=2.7){const g=dialogueCanvas.getContext('2d');g.fillStyle='#132e27';g.fillRect(0,0,1024,512);g.strokeStyle='#d4d9a0';g.lineWidth=8;g.strokeRect(8,8,1008,496);g.fillStyle='#e5dea8';g.font='bold 45px sans-serif';g.fillText(info[0]+' / '+info[1],40,75,950);g.fillStyle='#fff7e5';g.font='37px sans-serif';let line='',y=150;for(const word of info[2].split(' ')){if(g.measureText(line+word).width>925){g.fillText(line,40,y);line='';y+=52}line+=word+' '}g.fillText(line,40,y);g.font='26px sans-serif';g.fillStyle='#b8c6b3';g.fillText(footer,40,465);dialogueTexture.needsUpdate=true;dialogue.position.copy(position).add(new T.Vector3(0,lift,0));dialogue.visible=true;dialogueUntil=performance.now()+14000;document.querySelector('#worldStatus').textContent=info[0]+': '+info[2]}
   const exhibit=new T.Group();scene.add(exhibit);exhibit.visible=false;
   // A visible, life-size AR showcase, placed in front of the user's headset.
   const arStand=new T.Mesh(new T.CylinderGeometry(.63,.7,.075,32),new T.MeshStandardMaterial({color:0x183c37,metalness:.35,roughness:.45}));
@@ -365,8 +369,9 @@ export async function init(host, places, onVisit) {
   function updateCameraMode(){
     const third=thirdPerson&&!renderer.xr.isPresenting&&!aerial;
     avatar.visible=third;
-    const targetZ=third?3.7:0,targetY=third?1.1:0;
-    camera.position.set(0,targetY,targetZ);
+    const dist=third?3.7:0,targetY=third?1.1:0;
+    // Orbit behind the avatar along the look direction, so turning keeps it in view.
+    camera.position.set(Math.sin(yaw)*dist,targetY,Math.cos(yaw)*dist);avatar.rotation.y=yaw+Math.PI; // model faces +z; turn it to walk away from the camera
     const btn=document.querySelector('#cameraMode');if(btn)btn.textContent=thirdPerson?'Third-person: ON':'First-person: ON';
   }
   function setCameraMode(mode){thirdPerson=mode==='third';localStorage.setItem('bb-camera-mode',thirdPerson?'third':'first');updateCameraMode()}
@@ -377,12 +382,22 @@ export async function init(host, places, onVisit) {
   function reset(){if(renderer.xr.isPresenting)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=true;rig.position.set(39,36,54);camera.position.set(0,0,0);yaw=.6;pitch=-.5;camera.rotation.set(pitch,yaw,0);updateCameraMode()}
   street();
   function blocked(x,z){return homeMode?Math.abs(x)>5.8||Math.abs(z)>5.8:blockedAt(x,z,walls)}
-  function move(dx,dz){const n=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.12));for(let j=0;j<n;j++){let x=T.MathUtils.clamp(rig.position.x+dx/n,-27,27);if(aerial||!blocked(x,rig.position.z))rig.position.x=x;let z=T.MathUtils.clamp(rig.position.z+dz/n,-26,33);if(aerial||!blocked(rig.position.x,z))rig.position.z=z}}
-  function visit(i,inside=false){if(ar)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}const [x,z]=coords[i];aerial=false;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z+(inside?2.9:7));if(!renderer.xr.isPresenting){yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode()}}
+  const ok=(x,z)=>aerial?(x>-30&&x<30&&z>-98&&z<36):homeMode?!blocked(x,z):(walkable(x,z)&&!blocked(x,z));
+  function move(dx,dz){const n=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.12));for(let j=0;j<n;j++){const x=rig.position.x+dx/n;if(ok(x,rig.position.z))rig.position.x=x;const z=rig.position.z+dz/n;if(ok(rig.position.x,z))rig.position.z=z}}
+  function visit(i,inside=false){if(ar)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}const [x,z]=coords[i];aerial=false;rig.rotation.y=0;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z+(inside?2.9:7));if(!renderer.xr.isPresenting){yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode()}}
   function enterHome(id){if(ar)return;homeMode=true;city.visible=false;const selected=homes.enter(id);aerial=false;rig.position.set(0,1.7,4.8);camera.position.set(0,0,0);yaw=0;pitch=0;camera.rotation.set(0,0,0);updateCameraMode();return selected}
+  // ---- Districts: transit portals, storefront travel and product focus ----
+  function placeAt(x,z,y=0){if(ar)return;if(homeMode){homeMode=false;homes.leave();city.visible=true}aerial=false;rig.rotation.y=0;rig.position.set(x,renderer.xr.isPresenting?0:1.7,z);if(!renderer.xr.isPresenting){yaw=y;pitch=0;camera.rotation.set(0,y,0);updateCameraMode()}else rig.rotation.y=y}
+  let portalArmed=true;
+  function transit(fromId){const from=PORTALS.find(p=>p.id===fromId),to=PORTALS.find(p=>p.id===from.to);portalArmed=false;placeAt(to.arrive.x,to.arrive.z,to.arrive.yaw);document.querySelector('#worldStatus').textContent='Arrived: '+to.label}
+  function goDistrict(id){const p=PORTALS.find(q=>q.id===id);if(p)placeAt(p.arrive.x,p.arrive.z,p.arrive.yaw)}
+  // Storefronts face the boulevard: "outside" stands on the boulevard, "inside" just past the door.
+  function visitShop(i,inside=false){const [x,z,rot]=MARKET_LAYOUT[i];const [px,pz]=toWorld(0,inside?2.9:7,x,z,rot);placeAt(px,pz,rot)}
+  let focused=null;
+  function focusProduct(si,pi){if(focused)focused.focused=false;focused=market.products.find(p=>p.shop===si&&p.index===pi)||null;if(!focused)return;focused.focused=true;const d=focused.data;const pos=focused.group.getWorldPosition(new T.Vector3());speak([d.name,d.category,d.blurb+' '+(d.details[0]||'')],pos,'BUDZ MARKETPLACE · interactive display',focused.spin?.9:1.5)}
   const ray=new T.Raycaster(),pointer=new T.Vector2();
   // Select a person/sign, or teleport to visible floor surfaces in VR.
-  function selectRay(){const hit=ray.intersectObjects(city.children,true).find(h=>h.object!==dialogue);if(!hit||hit.distance>28)return;const data=hit.object.userData;if(data.npc){speak(data.npc,new T.Vector3(hit.point.x,0,hit.point.z));return}if(data.place!==undefined){onVisit(data.place);return}if(renderer.xr.isPresenting&&data.floor&&!blocked(hit.point.x,hit.point.z)){rig.position.set(hit.point.x,0,hit.point.z)}}
+  function selectRay(){const hit=ray.intersectObjects(city.children,true).find(h=>h.object!==dialogue);if(!hit||hit.distance>28)return;const data=hit.object.userData;if(data.product){focusProduct(...data.product);hooks.onProduct?.(...data.product);return}if(data.shop!==undefined){hooks.onShop?.(data.shop);return}if(data.portal){transit(data.portal);return}if(data.npc){speak(data.npc,new T.Vector3(hit.point.x,0,hit.point.z));return}if(data.place!==undefined){onVisit(data.place);return}if(renderer.xr.isPresenting&&data.floor&&walkable(hit.point.x,hit.point.z)&&!blocked(hit.point.x,hit.point.z)){rig.position.set(hit.point.x,0,hit.point.z)}}
   host.addEventListener('pointerdown',e=>{drag=true;travel=0;lastX=e.clientX;lastY=e.clientY;host.setPointerCapture(e.pointerId)});
   host.addEventListener('pointermove',e=>{if(!drag||renderer.xr.isPresenting)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;travel+=Math.abs(dx)+Math.abs(dy);yaw-=dx*.004*lookSensitivity;pitch=T.MathUtils.clamp(pitch-dy*.004*lookSensitivity*(invertLook?-1:1),-1.25,1.25);camera.rotation.set(pitch,yaw,0);lastX=e.clientX;lastY=e.clientY});
   host.addEventListener('pointerup',e=>{drag=false;if(travel>7||renderer.xr.isPresenting)return;const r=host.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);selectRay()});host.addEventListener('pointercancel',()=>drag=false);
@@ -439,7 +454,7 @@ export async function init(host, places, onVisit) {
     tap(8,()=>{document.querySelector('#walk')?.click()}); // View / Share
     previousButtons=pressed;
   }
-  const clock=new T.Clock(),direction=new T.Vector3();let time=0;
+  const clock=new T.Clock(),direction=new T.Vector3();let time=0,district='plaza';
   document.querySelector('#cameraMode')?.addEventListener('click',()=>setCameraMode(thirdPerson?'first':'third'));
   let frames=0;renderer.setAnimationLoop(()=>{
     const dt=Math.min(clock.getDelta(),.05);time+=dt;
@@ -456,12 +471,17 @@ export async function init(host, places, onVisit) {
     const moving=keys.size>0||[...previousButtons].some(i=>i===6);
     avatarLimbs.forEach((limb,i)=>{limb.rotation.x=T.MathUtils.lerp(limb.rotation.x,moving?Math.sin(time*9+(i%2)*Math.PI)*.35:0,.15)});
     for(const n of npcs){if(n.mixer)n.mixer.update(dt);if(n.walking){const t=time*.3+n.phase;n.root.position.z=n.startZ+Math.sin(t)*3;n.root.rotation.y=Math.cos(t)>=0?0:Math.PI;n.limbs.forEach((l,j)=>l.rotation.x=Math.sin(time*5+n.phase)*(j%2?.3:.22)*(j<2?1:-1))}else{n.root.position.y=Math.sin(time*1.4+n.phase)*.012;n.limbs[0].rotation.z=.08+Math.sin(time+n.phase)*.04}}
-    if(dialogue.visible){dialogue.lookAt(camera.getWorldPosition(direction));if(performance.now()>dialogueUntil)dialogue.visible=false}
+    if(dialogue.visible){dialogue.lookAt(camera.getWorldPosition(direction));if(performance.now()>dialogueUntil){dialogue.visible=false;if(focused){focused.focused=false;focused=null}}}
+    if(city.visible)market.update(dt,time);
+    if(!ar&&!aerial&&!homeMode){const px=rig.position.x,pz=rig.position.z,hitPortal=portalAt(px,pz);if(hitPortal&&portalArmed)transit(hitPortal.id);else if(!hitPortal&&PORTALS.every(p=>Math.hypot(px-p.x,pz-p.z)>1.6))portalArmed=true;
+      const d=districtAt(pz);if(d!==district){district=d;hooks.onDistrict?.(d)}}
+    // Keep the shadow camera centred on the visitor so both districts get shadows.
+    if(!ar){const sx=Math.round(rig.position.x/8)*8,sz=Math.round(rig.position.z/8)*8;sun.target.position.set(sx,0,sz);sun.position.set(sx-33,29,sz+20)}
     if(city.visible)updateLighting(rig.position,animateLighting ? time : 0);
     renderer.render(scene,camera);
     if(++frames===2)document.querySelector('#viewport').dataset.rendered='true';
   });
   new ResizeObserver(()=>{if(!host.clientWidth||!host.clientHeight)return;camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix();renderer.setSize(host.clientWidth,host.clientHeight)}).observe(host);
   renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();document.querySelector('#worldStatus').textContent='3D paused. Reload to restore, or use destination buttons.'});
-  return {reset,visit,enter:i=>visit(i,true),enterHome,setCameraMode,setAvatarColor,setLookSettings:(sensitivity,inverted)=>{lookSensitivity=sensitivity;invertLook=inverted}};
+  return {reset,visit,enter:i=>visit(i,true),enterHome,setCameraMode,setAvatarColor,setLookSettings:(sensitivity,inverted)=>{lookSensitivity=sensitivity;invertLook=inverted},goDistrict,visitShop,enterShop:i=>visitShop(i,true),focusProduct,stats:{shops:MARKET_LAYOUT.length,products:market.products.length,npcs:npcs.length}};
 }
