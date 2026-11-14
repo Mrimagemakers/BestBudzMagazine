@@ -3,10 +3,10 @@ import * as T from 'three';
 // Detailed, articulated lightweight characters built with mesh-based garments,
 // skin, eyes, hairstyles and accessories. All geometry stays Quest-friendly.
 const mat=(color,roughness=.78,metalness=0)=>new T.MeshStandardMaterial({color,roughness,metalness});
-const skinTones=['#82513d','#bd8160','#5f3e32','#d19e79','#a77457','#594338','#dda885','#90644f'];
-const jackets=['#5c7564','#af6649','#3e6382','#8d637a','#786b50','#2f6d6b','#9f805b','#55566e'];
+const skinTones=['#82513d','#e6b58f','#b77751','#f0c7a5','#614032','#d6a177','#a67a5b','#edcfb4','#956047','#c99a79','#785443','#e5ae82'];
+const jackets=['#5c7564','#b76549','#3e6382','#8d637a','#786b50','#2f6d6b','#9f805b','#55566e','#8b5c47','#334d67','#9c9276','#4d6d59'];
 const trousers=['#202b36','#30343c','#39443a','#292a31','#423d3d'];
-const hairTones=['#171411','#2a211b','#171819','#4b2f22'];
+const hairTones=['#171411','#714b2e','#26201b','#4b2f22','#1c1a18','#ad7850','#2c241e','#3a3026','#211d1b','#69452f','#2a221c','#8a583c'];
 
 export function createHuman(index=0,options={}){
   const group=new T.Group();group.name='Resident '+(index+1);
