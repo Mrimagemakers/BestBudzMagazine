@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {SkeletonUtils} from 'three/addons/utils/SkeletonUtils.js';
+import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 
 // Public Three.js example character assets. Models are loaded once, cloned with
 // independent skeletons, and safely fall back to the built-in detailed residents.
@@ -19,7 +19,7 @@ function fetchAsset(type){
 export async function upgradeResident(resident,type,{mobile=false,walking=false}={}){
   const asset=await fetchAsset(type);
   if(!asset||!resident?.root?.parent)return false;
-  const model=SkeletonUtils.clone(asset.scene);
+  const model=cloneSkeleton(asset.scene);
   const bounds=new THREE.Box3().setFromObject(model);
   const dimensions=bounds.getSize(new THREE.Vector3());
   if(dimensions.y<.01)return false;
