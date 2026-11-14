@@ -297,9 +297,19 @@ export async function init(host, places, onVisit) {
   for(let i=0;i<4;i++)createNPC(i%2?5:-5,-8+i*8,i+7,true);
   // Replace selected procedural NPCs with skinned, textured GLB characters.
   // Deferred so the world remains interactive while models load.
-  for(const index of [2]){
+  // Six unique resident slots: source-controlled GLB files can be added without
+  // replacing the interaction, dialogue or animation code.
+  const characterRoster=[
+    {name:'Maya',role:'Lounge Host',model:'maya.glb'},
+    {name:'Jules',role:'Market Host',model:'jules.glb'},
+    {name:'Ellis',role:'Coffee Shop Owner',model:'ellis.glb'},
+    {name:'Devin',role:'Music Producer',model:'devin.glb'},
+    {name:'Simone',role:'Cinema Host',model:'simone.glb'},
+    {name:'Morgan',role:'Editorial Guide',model:'morgan.glb'}
+  ];
+  for(const [index,profile] of characterRoster.entries()){
     const resident=npcs[index];
-    if(resident)upgradeResident(resident,'security',{mobile:mobileDevice,walking:resident.walking});
+    if(resident)upgradeResident(resident,profile.model,{mobile:mobileDevice,walking:resident.walking});
   }
   // In-world dialogue remains readable in a headset without relying on HTML overlays.
   const dialogueCanvas=document.createElement('canvas');dialogueCanvas.width=1024;dialogueCanvas.height=512;
